@@ -50,6 +50,7 @@ export interface Listing {
   emoji: string
   school: string
   is_sold: boolean
+  images: string[]
   created_at: string
   profiles?: Profile
 }
