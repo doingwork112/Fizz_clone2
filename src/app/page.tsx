@@ -98,8 +98,8 @@ export default function App() {
     return()=>{sb.removeChannel(ch);sb.removeChannel(mch);clearInterval(iv)}
   },[profile?.id])
 
-  async function handleLogin(){setAuthLoading(true);setAuthErr('');const{error}=await sb.auth.signInWithPassword({email:af.email,password:af.pwd});if(error)setAuthErr(lang==='zh'?'邮箱或密码错误':'Wrong email or password');setAuthLoading(false)}
-  async function handleRegister(){setAuthLoading(true);setAuthErr('');if(!af.username||!af.email||!af.pwd){setAuthErr(lang==='zh'?'请填写所有字段':'Please fill all fields');setAuthLoading(false);return};if(af.pwd.length<6){setAuthErr(lang==='zh'?'密码至少6位':'Password must be 6+ characters');setAuthLoading(false);return};const{error}=await sb.auth.signUp({email:af.email,password:af.pwd,options:{data:{username:af.username,school:af.school,avatar_initials:af.username.slice(0,2).toUpperCase(),avatar_color:AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)]}}}});if(error)setAuthErr(error.message);else setAuthErr(lang==='zh'?'注册成功！请查收验证邮件后登录':'Success! Check your email to verify.');setAuthLoading(false)}
+  async function handleLogin(){setAuthLoading(true);setAuthErr('');const{error}=await sb.auth.signInWithPassword({email:af.email,password:af.pwd});if(error)setAuthErr('Wrong email or password');setAuthLoading(false)}
+  async function handleRegister(){setAuthLoading(true);setAuthErr('');if(!af.username||!af.email||!af.pwd){setAuthErr('Please fill all fields');setAuthLoading(false);return};if(af.pwd.length<6){setAuthErr('Password must be 6+ characters');setAuthLoading(false);return};const{error}=await sb.auth.signUp({email:af.email,password:af.pwd,options:{data:{username:af.username,school:af.school,avatar_initials:af.username.slice(0,2).toUpperCase(),avatar_color:AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)]}}}});if(error)setAuthErr(error.message);else setAuthErr('Success! Check your email to verify.');setAuthLoading(false)}
 
   async function loadPosts(){const{data}=await sb.from('posts').select('*,profiles(*)').order('created_at',{ascending:false}).limit(100);if(!data)return;if(profile){const{data:votes}=await sb.from('fizzups').select('post_id,vote_type').eq('user_id',profile.id);const vm:Record<string,string>={};votes?.forEach(v=>vm[v.post_id]=v.vote_type);setPosts(data.map(p=>({...p,my_vote:vm[p.id]||null})))}else setPosts(data)}
 
@@ -122,7 +122,7 @@ export default function App() {
 
   function pickPostImages(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files||[]).slice(0,4);setPostImages(files);setPostPreviews(files.map(f=>URL.createObjectURL(f)))}
 
-  async function deletePst(id:string){if(!confirm(lang==='zh'?'确认删除？':'Delete this post?'))return;await sb.from('posts').delete().eq('id',id);loadPosts()}
+  async function deletePst(id:string){if(!confirm('Delete this post?'))return;await sb.from('posts').delete().eq('id',id);loadPosts()}
 
   async function toggleCmts(pid:string){if(openCmts[pid]){const c={...openCmts};delete c[pid];setOpenCmts(c)}else{const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',pid).order('created_at');setOpenCmts(p=>({...p,[pid]:data||[]}))}}
   async function submitCmt(pid:string){if(!profile||!cmtInputs[pid]?.trim())return;await sb.from('comments').insert({post_id:pid,user_id:profile.id,text:cmtInputs[pid].trim()});setCmtInputs(p=>({...p,[pid]:''}));const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',pid).order('created_at');setOpenCmts(p=>({...p,[pid]:data||[]}));loadPosts()}
@@ -335,7 +335,7 @@ export default function App() {
             </div>
           ))}
         </div>
-        {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>{lang==='zh'?'暂无商品':'No listings yet'}</div>}
+        {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>{'No listings yet'}</div>}
         <button onClick={()=>setShowListing(true)} style={{position:'fixed' as const,bottom:'72px',right:'16px',background:C.accent,color:'white',border:'none',borderRadius:'24px',padding:'12px 22px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:`0 4px 16px ${C.shadow}`,zIndex:150}}>+ {lang==='zh'?'发布':'List'}</button>
       </>}
 
@@ -349,7 +349,7 @@ export default function App() {
           {[t.posts,t.comments,t.saved].map((tab,i)=><div key={tab} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.92rem',fontWeight:i===0?700:400,color:i===0?C.text:C.muted,borderBottom:i===0?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer'}}>{tab}</div>)}
         </div>
         {posts.filter(p=>p.user_id===profile.id).map(p=><PostCard key={p.id} p={p}/>)}
-        {posts.every(p=>p.user_id!==profile.id)&&<div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}><div style={{fontSize:'3rem',opacity:.4}}>✏️</div><div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>{lang==='zh'?'还没有帖子':'No posts yet.'}</div></div>}
+        {posts.every(p=>p.user_id!==profile.id)&&<div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}><div style={{fontSize:'3rem',opacity:.4}}>✏️</div><div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>{'No posts yet.'}</div></div>}
         <button onClick={()=>setShowPost(true)} style={{position:'fixed' as const,bottom:'72px',right:'16px',background:C.accent,color:'white',border:'none',borderRadius:'24px',padding:'12px 22px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:`0 4px 16px ${C.shadow}`,zIndex:150}}>+ {t.post}</button>
       </>}
 
