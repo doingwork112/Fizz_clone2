@@ -110,7 +110,7 @@ export default function App() {
     setPosting(true)
     const urls:string[]=[]
     for(const file of postImages){
-      const path=profile.id+'/'+Date.now()+'_'+file.nameprofile.id+'/'+Date.now()+'_'+file.name`${profile.id}/${Date.now()}_${file.name}`
+      const path=profile.id+'/'+Date.now()+'_'+file.name
       const{error}=await sb.storage.from('post-images').upload(path,file,{upsert:true})
       if(!error){const{data:u}=sb.storage.from('post-images').getPublicUrl(path);urls.push(u.publicUrl)}
     }
@@ -127,7 +127,7 @@ export default function App() {
 
   async function loadListings(){const{data}=await sb.from('listings').select('*,profiles(*)').eq('is_sold',false).order('created_at',{ascending:false});setListings(data||[])}
   function pickFiles(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files||[]).slice(0,8);setLFiles(files);setLPreviews(files.map(f=>URL.createObjectURL(f)))}
-  async function submitListing(){if(!profile||!lf.title)return;setLUploading(true);const urls:string[]=[];for(const file of lFiles){const path=profile.id+'/'+Date.now()+'_'+file.nameprofile.id+'/'+Date.now()+'_'+file.name`${profile.id}/${Date.now()}_${file.name}`;const{error}=await sb.storage.from('listing-images').upload(path,file,{upsert:true});if(!error){const{data:u}=sb.storage.from('listing-images').getPublicUrl(path);urls.push(u.publicUrl)}};await sb.from('listings').insert({user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,category:lf.cat,description:lf.desc,emoji:'📦',school:profile.school,images:urls});setShowListing(false);setLf({title:'',price:'',cat:'clothes',desc:'',condition:'Good'});setLFiles([]);setLPreviews([]);setLUploading(false);loadListings()}
+  async function submitListing(){if(!profile||!lf.title)return;setLUploading(true);const urls:string[]=[];for(const file of lFiles){const path=profile.id+'/'+Date.now()+'_'+file.name;const{error}=await sb.storage.from('listing-images').upload(path,file,{upsert:true});if(!error){const{data:u}=sb.storage.from('listing-images').getPublicUrl(path);urls.push(u.publicUrl)}};await sb.from('listings').insert({user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,category:lf.cat,description:lf.desc,emoji:'📦',school:profile.school,images:urls});setShowListing(false);setLf({title:'',price:'',cat:'clothes',desc:'',condition:'Good'});setLFiles([]);setLPreviews([]);setLUploading(false);loadListings()}
 
   async function loadConvos(){if(!profile)return;const{data:users}=await sb.from('profiles').select('*').neq('id',profile.id);if(!users)return;const c=await Promise.all(users.map(async u=>{const{data:m}=await sb.from('messages').select('*').or(`and(from_user_id.eq.${profile.id},to_user_id.eq.${u.id}),and(from_user_id.eq.${u.id},to_user_id.eq.${profile.id})`).order('created_at',{ascending:false}).limit(1);return{user:u as Profile,lastMsg:m?.[0]}}));c.sort((a,b)=>(b.lastMsg?.created_at||'')>(a.lastMsg?.created_at||'')?1:-1);setConvos(c)}
   async function loadUnread(){if(!profile)return;const{count}=await sb.from('messages').select('*',{count:'exact',head:true}).eq('to_user_id',profile.id).eq('is_read',false);setUnread(count||0)}
