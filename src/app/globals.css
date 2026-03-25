@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0f0f13;
+  --surface: #18181f;
+  --surface2: #222230;
+  --border: #2e2e3f;
+  --primary: #7c6ff7;
+  --primary-light: #a59af9;
+  --accent: #f7a456;
+  --green: #4cd9a0;
+  --red: #f76f6f;
+  --text: #e8e8f0;
+  --muted: #888899;
+  --card: #1e1e28;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+.font-fizz { font-family: 'Nunito', sans-serif; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Card */
+.fizz-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Button */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 22px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-primary:hover { background: var(--primary-light); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* Input */
+.fizz-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  outline: none;
+  width: 100%;
+  transition: border .2s;
+}
+.fizz-input:focus { border-color: var(--primary); }
+.fizz-input::placeholder { color: var(--muted); }
+
+/* Online pulse */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse { animation: pulse 2s infinite; }
+
+/* Fizzin gradient badge */
+.fizzin-badge {
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  color: white;
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Poll */
+.poll-bar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: rgba(124,111,247,0.2);
+  border-radius: 10px;
+  transition: width 0.4s;
+}
