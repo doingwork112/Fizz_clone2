@@ -284,12 +284,12 @@ export default function App() {
   )
 
   const mktFiltered=mktCat==='all'?listings:listings.filter(l=>l.category===mktCat)
-  const topBar=(title:React.ReactNode,right?:React.ReactNode)=>(
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky' as const,top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
+  function topBar(title,right=null){return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:'1px solid '+C.border}}>
       <div style={{fontWeight:700,fontSize:'1.05rem',display:'flex',alignItems:'center',gap:'8px'}}>{title}</div>
       {right}
     </div>
-  )
+  )}
 
   return(
     <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative' as const,paddingBottom:'64px'}}>
