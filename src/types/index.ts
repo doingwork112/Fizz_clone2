@@ -19,6 +19,7 @@ export interface Post {
   comments_count: number
   is_hot: boolean
   poll: Poll | null
+  images: string[]
   created_at: string
   profiles?: Profile
   has_fizzupped?: boolean
