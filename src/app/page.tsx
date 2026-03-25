@@ -137,7 +137,18 @@ export default function App() {
   },[profile?.id])
 
   async function handleLogin(){setAuthLoading(true);setAuthErr('');const{error}=await sb.auth.signInWithPassword({email:af.email,password:af.pwd});if(error)setAuthErr('Wrong email or password');setAuthLoading(false)}
-  async function handleRegister(){setAuthLoading(true);setAuthErr('');if(!af.username||!af.email||!af.pwd){setAuthErr('Please fill all fields');setAuthLoading(false);return};if(af.pwd.length<6){setAuthErr('Password must be 6+ characters');setAuthLoading(false);return};const{error}=await sb.auth.signUp({email:af.email,password:af.pwd,options:{data:{username:af.username,school:af.school,avatar_initials:af.username.slice(0,2).toUpperCase(),avatar_color:AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)]}}}});if(error)setAuthErr(error.message);else setAuthErr('Success! Check your email to verify.');setAuthLoading(false)}
+  async function handleRegister(){
+    setAuthLoading(true)
+    setAuthErr('')
+    if(!af.username||!af.email||!af.pwd){setAuthErr('Please fill all fields');setAuthLoading(false);return}
+    if(af.pwd.length<6){setAuthErr('Password must be 6+ chars');setAuthLoading(false);return}
+    const ini=af.username.slice(0,2).toUpperCase()
+    const col=AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)]
+    const{error}=await sb.auth.signUp({email:af.email,password:af.pwd,options:{data:{username:af.username,school:af.school,avatar_initials:ini,avatar_color:col}}})
+    if(error)setAuthErr(error.message)
+    else setAuthErr('Success! Check your email.')
+    setAuthLoading(false)
+  }
 
   async function loadPosts(){const{data}=await sb.from('posts').select('*,profiles(*)').order('created_at',{ascending:false}).limit(100);if(!data)return;if(profile){const{data:votes}=await sb.from('fizzups').select('post_id,vote_type').eq('user_id',profile.id);const vm:Record<string,string>={};votes?.forEach(v=>vm[v.post_id]=v.vote_type);setPosts(data.map(p=>({...p,my_vote:vm[p.id]||null})))}else setPosts(data)}
 
