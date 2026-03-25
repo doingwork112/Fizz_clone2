@@ -76,6 +76,8 @@ export default function App() {
   const [postText, setPostText] = useState('')
   const [postAnon, setPostAnon] = useState(true)
   const [posting, setPosting] = useState(false)
+  const [postImgs, setPostImgs] = useState([])
+  const [postPrevs, setPostPrevs] = useState([])
 
   const [showListing, setShowListing] = useState(false)
   const [lf, setLf] = useState({ title:'', price:'', cat:'clothes', desc:'', condition:'Good' })
