@@ -15,6 +15,7 @@ export interface Post {
   is_anon: boolean
   school: string
   likes_count: number
+  dislikes_count: number
   comments_count: number
   is_hot: boolean
   poll: Poll | null
