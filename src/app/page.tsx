@@ -155,10 +155,24 @@ export default function App() {
   }
 
   async function submitPost() {
-    if (!profile||!postText.trim()) return
+    if (!profile||(!postText.trim()&&postImgs.length===0)) return
     setPosting(true)
-    await sb.from('posts').insert({user_id:profile.id,text:postText.trim(),is_anon:postAnon,school:profile.school})
-    setPostText(''); setShowPost(false); setPosting(false); loadPosts()
+    const urls=[]
+    for(const file of postImgs){
+      const path=profile.id+'/'+Date.now()+'_'+file.name
+      const res=await sb.storage.from('post-images').upload(path,file,{upsert:true})
+      if(!res.error){
+        const{data:u}=sb.storage.from('post-images').getPublicUrl(path)
+        urls.push(u.publicUrl)
+      }
+    }
+    await sb.from('posts').insert({user_id:profile.id,text:postText.trim(),is_anon:postAnon,school:profile.school,images:urls})
+    setPostText('');setPostImgs([]);setPostPrevs([]);setShowPost(false);setPosting(false);loadPosts()
+  }
+  function pickImgs(e){
+    const files=Array.from(e.target.files||[]).slice(0,4)
+    setPostImgs(files)
+    setPostPrevs(files.map(f=>URL.createObjectURL(f)))
   }
 
   async function deletePst(id:string) { if(!confirm('确认删除？'))return; await sb.from('posts').delete().eq('id',id); loadPosts() }
@@ -260,6 +274,7 @@ export default function App() {
             {p.is_hot && <span style={{background:'#fef3c7',color:'#d97706',borderRadius:'4px',padding:'1px 6px',fontSize:'0.68rem',fontWeight:700}}>🔥 HOT</span>}
           </div>
           <div style={{fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{p.text}</div>
+          {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {/* action row */}
           <div style={{display:'flex',alignItems:'center',gap:'14px',marginTop:'10px',color:C.muted}}>
             <button onClick={()=>toggleCmts(p.id)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
@@ -574,6 +589,7 @@ export default function App() {
               </div>
               <textarea style={{...inp,minHeight:'100px',resize:'none',border:'none',background:'transparent',padding:0,fontSize:'1rem',lineHeight:'1.5'}} placeholder="What's on your mind?" value={postText} onChange={e=>setPostText(e.target.value)} autoFocus />
             </div>
+            {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',marginBottom:'12px',borderRadius:'12px',overflow:'hidden'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'120px',objectFit:'cover'}}/>)}</div>}
             <div style={{display:'flex',alignItems:'center',paddingTop:'12px',borderTop:`1px solid ${C.border}`}}>
               <label style={{display:'flex',alignItems:'center',gap:'7px',cursor:'pointer',fontSize:'0.9rem',fontWeight:600,color:postAnon?C.accentBright:C.muted}}>
                 <input type="checkbox" checked={postAnon} onChange={e=>setPostAnon(e.target.checked)} style={{accentColor:C.accentBright,width:'16px',height:'16px',cursor:'pointer'}} />
