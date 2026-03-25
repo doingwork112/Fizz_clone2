@@ -30,8 +30,46 @@ const AV_COLORS = ['#1a3a5c','#2563eb','#7c3aed','#0891b2','#15803d','#b45309','
 const SCHOOLS = ['北京大学','清华大学','复旦大学','上海交通大学','浙江大学','南京大学','武汉大学','中山大学','华中科技大学','四川大学']
 
 const T = {
-  zh: { feed:'主页',messages:'消息',search:'搜索',market:'市场',profile:'我的',post:'发布',newPost:'新帖子',cancel:'取消',anonymous:'匿名发布',placeholder:'今天校园里有什么新鲜事？',addPhoto:'添加图片',top:'热门',fizzin:"Fizzin'",new:'最新',online:'人在线',karma:'积分',noPosts:'还没有帖子，来发第一条吧！',noPostsProfile:'还没有发帖，快去发一条吧！',reply:'回复',send:'发送',delete:'删除',report:'举报',sold:'标记已售',listItem:'发布商品',itemName:'商品名称 *',price:'价格（元）',description:'描述',category:'分类',condition:'成色',addPhotos:'点击添加照片（最多4张）',publish:'发布',uploading:'上传中…',posting:'发布中…',settings:'设置',theme:'显示主题',light:'浅色',dark:'深色',auto:'跟随系统',account:'账号',logout:'退出登录',login:'登录',register:'注册',email:'邮箱',password:'密码',nickname:'昵称',school:'学校',createAccount:'创建账号',noAccount:'还没有账号？',hasAccount:'已有账号？',myProfile:'我的主页',posts:'帖子',comments:'评论',saved:'收藏',noMessages:'还没有消息',startConvo:'发个消息打个招呼 👋',searchPlaceholder:'搜索沸点',hotTopics:'热门话题',searchListings:'搜索商品…',allCategories:'全部',clothes:'服装',electronics:'电子',books:'教材',other:'其他',language:'语言',good:'成色良好',likeNew:'近全新',brandNew:'全新',fair:'一般' },
-  en: { feed:'Home',messages:'Messages',search:'Search',market:'Market',profile:'Profile',post:'Post',newPost:'New Post',cancel:'Cancel',anonymous:'Post Anonymously',placeholder:"What's happening on campus?",addPhoto:'Add Photo',top:'Top',fizzin:"Fizzin'",new:'New',online:'online',karma:'Karma',noPosts:'No posts yet. Be the first!',noPostsProfile:'No posts yet. Write one!',reply:'Reply',send:'Send',delete:'Delete',report:'Report',sold:'Mark Sold',listItem:'List Item',itemName:'Item Name *',price:'Price (¥)',description:'Description',category:'Category',condition:'Condition',addPhotos:'Tap to add photos (max 4)',publish:'Publish',uploading:'Uploading…',posting:'Posting…',settings:'Settings',theme:'Theme',light:'Light',dark:'Dark',auto:'Auto',account:'Account',logout:'Sign Out',login:'Login',register:'Register',email:'Email',password:'Password',nickname:'Username',school:'School',createAccount:'Create Account',noAccount:"Don't have an account?",hasAccount:'Already have an account?',myProfile:'My Profile',posts:'Posts',comments:'Comments',saved:'Saved',noMessages:'No messages yet',startConvo:'Say hello 👋',searchPlaceholder:'Search Feidian',hotTopics:'Trending',searchListings:'Search listings…',allCategories:'All',clothes:'Clothes',electronics:'Electronics',books:'Books',other:'Other',language:'Language',good:'Good',likeNew:'Like New',brandNew:'New',fair:'Fair' }
+  zh: {
+    feed:'Main',messages:'Messages',search:'Search',market:'Market',profile:'Profile',
+    post:'Post',newPost:'New Post',cancel:'Cancel',anonymous:'Post Anonymously',
+    placeholder:'Share something with your campus...',addPhoto:'Add Photo',
+    top:'Top',fizzin:"Fizzin'",new:'New',online:'online',karma:'Karma',
+    noPosts:'No posts yet. Be the first!',noPostsProfile:'No posts yet.',
+    reply:'Reply',send:'Send',delete:'Delete',report:'Report',sold:'Mark Sold',
+    listItem:'List Item',itemName:'Item Name *',price:'Price',description:'Description',
+    category:'Category',condition:'Condition',addPhotos:'Add photos (max 4)',
+    publish:'Publish',uploading:'Uploading...',posting:'Posting...',
+    settings:'Settings',theme:'Theme',light:'Light',dark:'Dark',auto:'Auto',
+    account:'Account',logout:'Sign Out',login:'Login',register:'Register',
+    email:'Email',password:'Password',nickname:'Username',school:'School',
+    createAccount:'Create Account',noAccount:'No account?',hasAccount:'Have account?',
+    myProfile:'My Profile',posts:'Posts',comments:'Comments',saved:'Saved',
+    noMessages:'No messages yet',startConvo:'Say hello',
+    searchPlaceholder:'Search',hotTopics:'Trending',searchListings:'Search listings...',
+    allCategories:'All',clothes:'Clothes',electronics:'Electronics',books:'Books',
+    other:'Other',language:'Language',good:'Good',likeNew:'Like New',brandNew:'New',fair:'Fair'
+  },
+  en: {
+    feed:'Home',messages:'Messages',search:'Search',market:'Market',profile:'Profile',
+    post:'Post',newPost:'New Post',cancel:'Cancel',anonymous:'Post Anonymously',
+    placeholder:"What's happening on campus?",addPhoto:'Add Photo',
+    top:'Top',fizzin:"Fizzin'",new:'New',online:'online',karma:'Karma',
+    noPosts:'No posts yet. Be the first!',noPostsProfile:'No posts yet.',
+    reply:'Reply',send:'Send',delete:'Delete',report:'Report',sold:'Mark Sold',
+    listItem:'List Item',itemName:'Item Name *',price:'Price',description:'Description',
+    category:'Category',condition:'Condition',addPhotos:'Add photos (max 4)',
+    publish:'Publish',uploading:'Uploading...',posting:'Posting...',
+    settings:'Settings',theme:'Theme',light:'Light',dark:'Dark',auto:'Auto',
+    account:'Account',logout:'Sign Out',login:'Login',register:'Register',
+    email:'Email',password:'Password',nickname:'Username',school:'School',
+    createAccount:'Create Account',noAccount:"No account?",hasAccount:'Have account?',
+    myProfile:'My Profile',posts:'Posts',comments:'Comments',saved:'Saved',
+    noMessages:'No messages yet',startConvo:'Say hello',
+    searchPlaceholder:'Search',hotTopics:'Trending',searchListings:'Search listings...',
+    allCategories:'All',clothes:'Clothes',electronics:'Electronics',books:'Books',
+    other:'Other',language:'Language',good:'Good',likeNew:'Like New',brandNew:'New',fair:'Fair'
+  }
 }
 
 function ago(ts:string) { const d=Date.now()-new Date(ts).getTime(); if(d<60000)return'now'; if(d<3600000)return`${Math.floor(d/60000)}m`; if(d<86400000)return`${Math.floor(d/3600000)}h`; return`${Math.floor(d/86400000)}d` }
@@ -354,7 +392,13 @@ export default function App() {
       </>}
 
       <nav style={{position:'fixed' as const,bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'env(safe-area-inset-bottom)'}}>
-        {[{id:'feed',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},{id:'messages',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},{id:'search',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},{id:'market',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},{id:'profile',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}].map(n=>(
+        {[
+          {id:'feed',icon:(a)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
+          {id:'messages',icon:(a)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
+          {id:'search',icon:(a)=><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
+          {id:'market',icon:(a)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
+          {id:'profile',icon:(a)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+        ].map(n=>(
           <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',padding:'10px 0 8px',cursor:'pointer',border:'none',background:'none',position:'relative' as const}}>
             <div style={{position:'relative' as const}}>{n.icon(page===n.id)}{(n as any).badge?<span style={{position:'absolute' as const,top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span>:null}</div>
           </button>
