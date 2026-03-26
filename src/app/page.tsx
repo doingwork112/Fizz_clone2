@@ -414,7 +414,7 @@ export default function App() {
   }
 
 
-    if(!session||!profile) return(
+  if(!session||!profile) return(
     <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
       <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright}}>沸点</div>
       <div style={{width:'100%',maxWidth:'360px'}}>
