@@ -68,15 +68,6 @@ export default function App() {
   const [showRepost, setShowRepost] = useState(false)
   const [selectedPost, setSelectedPost] = useState(null)
 
-  function openPost(p){
-    setSelectedPost(p)
-    if(!openCmts[p.id]){
-      sb.from('comments').select('*,profiles(*)').eq('post_id',p.id).order('created_at').then(({data})=>{
-        setOpenCmts(x=>({...x,[p.id]:data||[]}))
-        if(data&&data.length>0) loadCommentVotes(data)
-      })
-    }
-  }
   const [repostTarget, setRepostTarget] = useState(null)
   const [repostText, setRepostText] = useState('')
   const [repostAnon, setRepostAnon] = useState(true)
@@ -93,6 +84,10 @@ export default function App() {
   const [openCmts, setOpenCmts] = useState<Record<string,Comment[]>>({})
   const [cmtInputs, setCmtInputs] = useState<Record<string,string>>({})
   const [mktCat, setMktCat] = useState('all')
+  const [userRank, setUserRank] = useState(0)
+  const [replyToComment, setReplyToComment] = useState<any>(null)
+  const [cmtImgs, setCmtImgs] = useState<File[]>([])
+  const [cmtPrevs, setCmtPrevs] = useState<string[]>([])
 
   const [showPost, setShowPost] = useState(false)
   const [postText, setPostText] = useState('')
@@ -111,6 +106,9 @@ export default function App() {
   const chatRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
     sb.auth.getSession().then(({ data }) => { setSession(data.session); if (data.session) loadProfile(data.session.user.id) })
     const { data: { subscription } } = sb.auth.onAuthStateChange((_e, s) => { setSession(s); if (s) loadProfile(s.user.id); else setProfile(null) })
     return () => subscription.unsubscribe()
@@ -153,11 +151,22 @@ export default function App() {
   async function loadPosts() {
     const { data } = await sb.from('posts').select('*, profiles(*)').order('created_at',{ascending:false}).limit(100)
     if (!data) return
+    // Batch fetch original posts for any reposts
+    const repostIds = data.filter((p:any) => p.repost_of_id).map((p:any) => p.repost_of_id)
+    let repostMap: Record<string,any> = {}
+    if (repostIds.length > 0) {
+      const { data: origPosts } = await sb.from('posts').select('*, profiles(*)').in('id', repostIds)
+      origPosts?.forEach((p:any) => { repostMap[p.id] = p })
+    }
+    const withReposts = data.map((p:any) => ({...p, repost_of: p.repost_of_id ? repostMap[p.repost_of_id] : null}))
     if (profile) {
       const { data: votes } = await sb.from('fizzups').select('post_id,vote_type').eq('user_id',profile.id)
-      const vm: Record<string,string> = {}; votes?.forEach(v=>vm[v.post_id]=v.vote_type)
-      setPosts(data.map(p=>({...p,my_vote:vm[p.id]||null})))
-    } else setPosts(data)
+      const vm: Record<string,string> = {}; votes?.forEach((v:any)=>vm[v.post_id]=v.vote_type)
+      setPosts(withReposts.map((p:any)=>({...p,my_vote:vm[p.id]||null})))
+      // Reload profile so karma (total_fizzups) stays current
+      const { data: freshProfile } = await sb.from('profiles').select('*').eq('id', profile.id).single()
+      if (freshProfile) setProfile(freshProfile)
+    } else setPosts(withReposts)
   }
 
   function sorted() {
@@ -171,21 +180,15 @@ export default function App() {
     if (!profile) return
     const mv = (post as any).my_vote
     if (mv===type) {
-      // undo vote
+      // undo vote — trigger handles DB count
       await sb.from('fizzups').delete().eq('post_id',post.id).eq('user_id',profile.id)
-      if (type==='up') await sb.from('posts').update({likes_count: Math.max(0, post.likes_count-1)}).eq('id',post.id)
-      else await sb.from('posts').update({dislikes_count: Math.max(0, (post.dislikes_count||0)-1)}).eq('id',post.id)
     } else {
       // remove old vote if exists
       if (mv) {
         await sb.from('fizzups').delete().eq('post_id',post.id).eq('user_id',profile.id)
-        if (mv==='up') await sb.from('posts').update({likes_count: Math.max(0, post.likes_count-1)}).eq('id',post.id)
-        else await sb.from('posts').update({dislikes_count: Math.max(0, (post.dislikes_count||0)-1)}).eq('id',post.id)
       }
-      // add new vote
+      // add new vote — trigger handles DB count + total_fizzups
       await sb.from('fizzups').insert({post_id:post.id,user_id:profile.id,vote_type:type})
-      if (type==='up') await sb.from('posts').update({likes_count: post.likes_count+1}).eq('id',post.id)
-      else await sb.from('posts').update({dislikes_count: (post.dislikes_count||0)+1}).eq('id',post.id)
     }
     const newMyVote = mv===type ? null : type
     let newLikes = post.likes_count
@@ -224,7 +227,7 @@ export default function App() {
     setPostText('');setPostImgs([]);setPostPrevs([]);setShowPost(false);setPosting(false);loadPosts()
   }
   function pickImgs(e){
-    const files=Array.from(e.target.files||[]).slice(0,4)
+    const files=Array.from(e.target.files||[]).slice(0,4) as File[]
     setPostImgs(files)
     setPostPrevs(files.map(f=>URL.createObjectURL(f)))
   }
@@ -265,38 +268,6 @@ export default function App() {
     setLUploading(false); loadListings()
   }
 
-  async function submitRepost(){
-    if(!profile||!repostTarget)return
-    setReposting(true)
-    await sb.from('reposts').insert({user_id:profile.id,original_post_id:repostTarget.id,text:repostText.trim(),is_anon:repostAnon,school:profile.school})
-    await sb.from('posts').update({reposts_count:(repostTarget.reposts_count||0)+1}).eq('id',repostTarget.id)
-    setRepostText('');setShowRepost(false);setReposting(false);setRepostTarget(null);loadPosts()
-  }
-
-  async function voteComment(comment, type){
-    if(!profile)return
-    const mv = commentVotes[comment.id]
-    if(mv===type){
-      await sb.from('comment_votes').delete().eq('comment_id',comment.id).eq('user_id',profile.id)
-      if(type==='up') await sb.from('comments').update({likes_count:Math.max(0,(comment.likes_count||0)-1)}).eq('id',comment.id)
-      else await sb.from('comments').update({dislikes_count:Math.max(0,(comment.dislikes_count||0)-1)}).eq('id',comment.id)
-      setCommentVotes(v=>({...v,[comment.id]:null}))
-    } else {
-      if(mv){
-        await sb.from('comment_votes').delete().eq('comment_id',comment.id).eq('user_id',profile.id)
-        if(mv==='up') await sb.from('comments').update({likes_count:Math.max(0,(comment.likes_count||0)-1)}).eq('id',comment.id)
-        else await sb.from('comments').update({dislikes_count:Math.max(0,(comment.dislikes_count||0)-1)}).eq('id',comment.id)
-      }
-      await sb.from('comment_votes').insert({comment_id:comment.id,user_id:profile.id,vote_type:type})
-      if(type==='up') await sb.from('comments').update({likes_count:(comment.likes_count||0)+1}).eq('id',comment.id)
-      else await sb.from('comments').update({dislikes_count:(comment.dislikes_count||0)+1}).eq('id',comment.id)
-      setCommentVotes(v=>({...v,[comment.id]:type}))
-    }
-    const pid=comment.post_id
-    const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',pid).order('created_at')
-    setOpenCmts(p=>({...p,[pid]:data||[]}))
-  }
-
   async function openPost(p:Post){
     setSelectedPost(p)
     setCmtInput('')
@@ -312,17 +283,42 @@ export default function App() {
   }
 
   async function submitNewCmt(){
-    if(!profile||!cmtInput.trim()||!selectedPost)return
-    await sb.from('comments').insert({post_id:selectedPost.id,user_id:profile.id,text:cmtInput.trim()})
-    setCmtInput('')
+    if(!profile||(!cmtInput.trim()&&cmtImgs.length===0)||!selectedPost)return
+    // Upload comment images if any
+    const urls:string[]=[]
+    for(const file of cmtImgs){
+      const path=profile.id+'/cmt_'+Date.now()+'_'+file.name
+      const res=await sb.storage.from('post-images').upload(path,file,{upsert:true})
+      if(!res.error){const{data:u}=sb.storage.from('post-images').getPublicUrl(path);urls.push(u.publicUrl)}
+    }
+    await sb.from('comments').insert({
+      post_id:selectedPost.id,
+      user_id:profile.id,
+      text:cmtInput.trim(),
+      parent_id:replyToComment?.id||null,
+      images:urls
+    })
+    setCmtInput('');setCmtImgs([]);setCmtPrevs([]);setReplyToComment(null)
     const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',selectedPost.id).order('created_at')
-    setPostComments(data||[])
+    if(data){
+      // Preserve local vote counts (DB may lag if triggers haven't run yet)
+      const merged=data.map((c:any)=>{
+        const existing=postComments.find((x:any)=>x.id===c.id)
+        return existing?{...c,likes_count:existing.likes_count,dislikes_count:existing.dislikes_count}:c
+      })
+      setPostComments(merged)
+    }
     loadPosts()
+  }
+  function pickCmtImgs(e:React.ChangeEvent<HTMLInputElement>){
+    const files=Array.from(e.target.files||[]).slice(0,4) as File[]
+    setCmtImgs(files);setCmtPrevs(files.map(f=>URL.createObjectURL(f)))
   }
 
   async function voteComment(c:any,type:'up'|'down'){
     if(!profile)return
     const mv=commentVotes[c.id]
+    // Optimistic update
     let nl=(c.likes_count||0),nd=(c.dislikes_count||0)
     if(type==='up'){if(mv==='up')nl--;else{nl++;if(mv==='down')nd--}}
     else{if(mv==='down')nd--;else{nd++;if(mv==='up')nl--}}
@@ -330,21 +326,28 @@ export default function App() {
     const nv=mv===type?null:type
     setCommentVotes(v=>({...v,[c.id]:nv}))
     setPostComments(cs=>cs.map((x:any)=>x.id===c.id?{...x,likes_count:nl,dislikes_count:nd}:x))
+    // DB update — trigger handles counts
     if(mv===type){
       await sb.from('comment_votes').delete().eq('comment_id',c.id).eq('user_id',profile.id)
     } else {
       if(mv)await sb.from('comment_votes').delete().eq('comment_id',c.id).eq('user_id',profile.id)
       await sb.from('comment_votes').insert({comment_id:c.id,user_id:profile.id,vote_type:type})
     }
-    if(type==='up')await sb.from('comments').update({likes_count:nl}).eq('id',c.id)
-    else await sb.from('comments').update({dislikes_count:nd}).eq('id',c.id)
   }
 
   async function submitRepost(){
     if(!profile||!repostTarget)return
     setReposting(true)
-    await sb.from('reposts').insert({user_id:profile.id,original_post_id:repostTarget.id,text:repostText.trim(),is_anon:repostAnon,school:profile.school})
-    await sb.from('posts').update({reposts_count:(repostTarget.reposts_count||0)+1}).eq('id',repostTarget.id)
+    // Insert as a real post with repost_of_id so it shows in feed
+    await sb.from('posts').insert({
+      user_id:profile.id,
+      text:repostText.trim()||'',
+      is_anon:repostAnon,
+      school:profile.school,
+      repost_of_id:repostTarget.id
+    })
+    // Increment reposts_count via security definer RPC (bypasses RLS)
+    await sb.rpc('increment_reposts_count',{post_id:repostTarget.id})
     setRepostText('');setShowRepost(false);setReposting(false);setRepostTarget(null)
     loadPosts()
   }
@@ -358,9 +361,18 @@ export default function App() {
 
   async function loadConvos() {
     if (!profile) return
-    const { data: users } = await sb.from('profiles').select('*').neq('id',profile.id)
+    // Only load users who have actually exchanged messages with current user
+    const { data: msgs } = await sb.from('messages')
+      .select('from_user_id,to_user_id')
+      .or(`from_user_id.eq.${profile.id},to_user_id.eq.${profile.id}`)
+    if (!msgs || msgs.length === 0) { setConvos([]); return }
+    const partnerIds = Array.from(new Set(msgs.flatMap((m:any) =>
+      [m.from_user_id, m.to_user_id].filter((id:string) => id !== profile.id)
+    )))
+    if (partnerIds.length === 0) { setConvos([]); return }
+    const { data: users } = await sb.from('profiles').select('*').in('id', partnerIds)
     if (!users) return
-    const c = await Promise.all(users.map(async u=>{
+    const c = await Promise.all(users.map(async (u:any)=>{
       const { data: m } = await sb.from('messages').select('*').or(`and(from_user_id.eq.${profile.id},to_user_id.eq.${u.id}),and(from_user_id.eq.${u.id},to_user_id.eq.${profile.id})`).order('created_at',{ascending:false}).limit(1)
       return {user:u as Profile,lastMsg:m?.[0]}
     }))
@@ -420,6 +432,17 @@ export default function App() {
           </div>
           <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{p.text}</div>
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
+          {(p as any).repost_of&&(
+            <div style={{border:`1px solid ${C.border}`,borderRadius:'12px',padding:'10px 12px',marginTop:'10px',background:C.surface}} onClick={()=>openPost((p as any).repost_of)}>
+              <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
+                <div style={{width:'20px',height:'20px',borderRadius:'50%',background:(p as any).repost_of.is_anon?avColor((p as any).repost_of.user_id):((p as any).repost_of.profiles?.avatar_color||'#888'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.55rem',color:'white',fontWeight:700}}>{(p as any).repost_of.is_anon?anonEmoji((p as any).repost_of.user_id):((p as any).repost_of.profiles?.avatar_initials||'?')}</div>
+                <span style={{fontSize:'0.78rem',fontWeight:600,color:C.muted}}>{(p as any).repost_of.is_anon?'Anonymous':((p as any).repost_of.profiles?.username||'User')}</span>
+                <span style={{fontSize:'0.72rem',color:C.muted}}>{ago((p as any).repost_of.created_at)}</span>
+              </div>
+              <div style={{fontSize:'0.88rem',color:C.text,lineHeight:'1.45'}}>{(p as any).repost_of.text}</div>
+              {(p as any).repost_of.images&&(p as any).repost_of.images.length>0&&<img src={(p as any).repost_of.images[0]} alt="" style={{width:'100%',maxHeight:'120px',objectFit:'cover',borderRadius:'8px',marginTop:'6px'}}/>}
+            </div>
+          )}
           {/* action row */}
           <div style={{display:'flex',alignItems:'center',gap:'14px',marginTop:'10px',color:C.muted}}>
             <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
@@ -432,13 +455,6 @@ export default function App() {
             </button>
             <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-              {p.reposts_count||0}
-            </button>
-            <button style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             </button>
             <span style={{fontSize:'0.9rem',cursor:'pointer',color:C.muted}}>•••</span>
             {p.user_id===profile!.id && <button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.82rem',padding:0,marginLeft:'auto'}}>删除</button>}
@@ -621,12 +637,24 @@ export default function App() {
         {searchRes.map(p=><PostCard key={p.id} p={p}/>)}
         {searchQ&&searchRes.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>没有找到结果</div>}
         {!searchQ && <div style={{padding:'0 16px'}}>
-          {['#期末备考','#食堂推荐','#校园生活','#选课攻略','#考研经验','#社团招新'].map((t,i)=>(
-            <div key={t} onClick={()=>setSearchQ(t)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'14px 0',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
-              <span style={{color:C.muted,fontWeight:700,width:'22px',fontSize:'0.88rem'}}>{i+1}</span>
-              <span style={{fontWeight:600,fontSize:'0.95rem'}}>{t}</span>
-            </div>
-          ))}
+          <div style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:'.5px',padding:'12px 0 6px'}}>Trending in your school</div>
+          {(() => {
+            // Extract hashtags from recent posts, fall back to post snippets
+            const tagCount: Record<string,number> = {}
+            posts.slice(0,80).forEach(p => {
+              const matches = p.text.match(/#[\w\u4e00-\u9fa5]+/g)||[]
+              matches.forEach(t => { tagCount[t] = (tagCount[t]||0) + 1 })
+            })
+            const tags = Object.entries(tagCount).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t)
+            const fallback = posts.slice(0,6).map(p=>p.text.replace(/\n/g,' ').slice(0,20).trim()).filter(Boolean)
+            const items = tags.length >= 3 ? tags : fallback.slice(0,6)
+            return items.map((t,i)=>(
+              <div key={t+i} onClick={()=>setSearchQ(t)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'14px 0',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
+                <span style={{color:C.muted,fontWeight:700,width:'22px',fontSize:'0.88rem'}}>{i+1}</span>
+                <span style={{fontWeight:600,fontSize:'0.95rem'}}>{t}</span>
+              </div>
+            ))
+          })()}
         </div>}
       </>}
 
@@ -677,15 +705,25 @@ export default function App() {
       {/* ─── PROFILE ─── */}
       {page==='profile' && <>
         {topBar(<>My Profile <span style={{color:C.muted,fontSize:'0.9rem'}}>▾</span></>, <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.2rem'}}>⚙️</button>)}
+        {/* Load rank when profile page is shown */}
+        {page==='profile' && userRank===0 && (() => {
+          sb.from('profiles').select('*',{count:'exact',head:true}).gt('total_fizzups',profile.total_fizzups).then(({count})=>setUserRank((count||0)+1))
+          return null
+        })()}
         <div style={{display:'flex',margin:'16px',background:C.surface,borderRadius:'16px',overflow:'hidden',border:`1px solid ${C.border}`}}>
           <div style={{flex:1,padding:'16px',textAlign:'center',borderRight:`1px solid ${C.border}`}}>
             <div style={{fontSize:'1.4rem',marginBottom:'2px'}}>❤️</div>
             <div style={{fontWeight:700,fontSize:'1.4rem'}}>{profile.total_fizzups}</div>
             <div style={{fontSize:'0.82rem',color:C.muted}}>Karma</div>
           </div>
-          <div style={{flex:1,padding:'16px',textAlign:'center'}}>
+          <div style={{flex:1,padding:'16px',textAlign:'center',borderRight:`1px solid ${C.border}`}}>
             <div style={{fontSize:'1.4rem',marginBottom:'2px'}}>🏆</div>
-            <div style={{fontWeight:700,fontSize:'1.4rem'}}>#{posts.filter(p=>p.user_id===profile.id).length||'—'}</div>
+            <div style={{fontWeight:700,fontSize:'1.4rem'}}>#{userRank||'—'}</div>
+            <div style={{fontSize:'0.82rem',color:C.muted}}>Ranking</div>
+          </div>
+          <div style={{flex:1,padding:'16px',textAlign:'center'}}>
+            <div style={{fontSize:'1.4rem',marginBottom:'2px'}}>✏️</div>
+            <div style={{fontWeight:700,fontSize:'1.4rem'}}>{posts.filter(p=>p.user_id===profile.id).length}</div>
             <div style={{fontSize:'0.82rem',color:C.muted}}>Posts</div>
           </div>
         </div>
@@ -847,85 +885,6 @@ export default function App() {
       )}
 
       {selectedPost&&(
-        <div style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column'}}>
-          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky',top:0,background:C.bg}}>
-            <button onClick={()=>{setSelectedPost(null);loadPosts()}} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
-            <div style={{fontWeight:700}}>Post</div>
-          </div>
-          <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
-            <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
-              <div style={{width:'40px',height:'40px',borderRadius:'50%',background:selectedPost.is_anon?avColor(selectedPost.user_id):(selectedPost.profiles?.avatar_color||avColor(selectedPost.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
-                {selectedPost.is_anon?anonEmoji(selectedPost.user_id):(selectedPost.profiles?.avatar_initials||'?')}
-              </div>
-              <div>
-                <div style={{fontWeight:600}}>{selectedPost.is_anon?'Anonymous':(selectedPost.profiles?.username||'User')}</div>
-                <div style={{fontSize:'0.78rem',color:C.muted}}>{ago(selectedPost.created_at)}</div>
-              </div>
-            </div>
-            <div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'16px'}}>{selectedPost.text}</div>
-            {selectedPost.images&&selectedPost.images.length>0&&(
-              <div style={{display:'grid',gridTemplateColumns:selectedPost.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginBottom:'16px',borderRadius:'12px',overflow:'hidden'}}>
-                {selectedPost.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:selectedPost.images.length===1?'280px':'160px',objectFit:'cover'}}/>)}
-              </div>
-            )}
-            <div style={{display:'flex',gap:'14px',paddingBottom:'16px',borderBottom:'1px solid '+C.border}}>
-              <button onClick={()=>vote(selectedPost,'up')} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',cursor:'pointer',color:(selectedPost.my_vote)==='up'?C.upvote:C.muted,padding:0}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill={(selectedPost.my_vote)==='up'?C.upvote:'none'} stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
-                {selectedPost.likes_count}
-              </button>
-              <button onClick={()=>vote(selectedPost,'down')} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',cursor:'pointer',color:(selectedPost.my_vote)==='down'?C.red:C.muted,padding:0}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill={(selectedPost.my_vote)==='down'?C.red:'none'} stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                {selectedPost.dislikes_count||0}
-              </button>
-            </div>
-            <div style={{marginTop:'16px'}}>
-              <div style={{fontWeight:700,marginBottom:'12px'}}>Comments</div>
-              {(openCmts[selectedPost.id]||[]).length===0&&<div style={{color:C.muted,textAlign:'center',padding:'30px 0'}}>No comments yet. Start the conversation!</div>}
-              {(openCmts[selectedPost.id]||[]).map(c=>(
-                <div key={c.id} style={{display:'flex',gap:'10px',marginBottom:'16px'}}>
-                  <div style={{width:'32px',height:'32px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.78rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:'0.85rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
-                    <div style={{fontSize:'0.9rem',margin:'3px 0'}}>{c.text}</div>
-                    <div style={{display:'flex',gap:'12px',marginTop:'4px'}}>
-                      <button onClick={()=>voteComment(c,'up')} style={{display:'flex',alignItems:'center',gap:'3px',background:'none',border:'none',cursor:'pointer',color:commentVotes[c.id]==='up'?C.upvote:C.muted,fontSize:'0.8rem',padding:0}}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill={commentVotes[c.id]==='up'?C.upvote:'none'} stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
-                        {c.likes_count||0}
-                      </button>
-                      <button onClick={()=>voteComment(c,'down')} style={{display:'flex',alignItems:'center',gap:'3px',background:'none',border:'none',cursor:'pointer',color:commentVotes[c.id]==='down'?C.red:C.muted,fontSize:'0.8rem',padding:0}}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill={commentVotes[c.id]==='down'?C.red:'none'} stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                        {c.dislikes_count||0}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{padding:'12px 16px',borderTop:'1px solid '+C.border,display:'flex',gap:'8px',background:C.bg}}>
-            <input style={{flex:1,background:C.surface,border:'1px solid '+C.border,borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder="Add a comment..." value={cmtInputs[selectedPost.id]||''} onChange={e=>setCmtInputs(x=>({...x,[selectedPost.id]:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&submitCmt(selectedPost.id)} />
-            <button onClick={()=>submitCmt(selectedPost.id)} style={{padding:'10px 18px',background:C.accentBright,color:'white',border:'none',borderRadius:'24px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Post</button>
-          </div>
-        </div>
-      )}
-
-      {showRepost&&repostTarget&&(
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:500,display:'flex',flexDirection:'column',justifyContent:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowRepost(false)}>
-          <div style={{background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
-              <button onClick={()=>setShowRepost(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontFamily:'inherit'}}>Cancel</button>
-              <div style={{fontWeight:700}}>Repost</div>
-              <button onClick={submitRepost} disabled={reposting} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{reposting?'...':'Post'}</button>
-            </div>
-            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none',color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'12px'}} placeholder="Add a comment..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
-            <div style={{background:C.surface,borderRadius:'12px',padding:'12px',borderLeft:'3px solid '+C.accentBright}}>
-              <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'4px'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</div>
-              <div style={{fontSize:'0.9rem'}}>{repostTarget.text}</div>
-            </div>
-          </div>
-        </div>
-      )}
-      {selectedPost&&(
         <div style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column' as const}}>
           <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky' as const,top:0,background:C.bg}}>
             <button onClick={()=>setSelectedPost(null)} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
@@ -972,29 +931,71 @@ export default function App() {
             {postComments.map((c:any)=>{
               const cmv=commentVotes[c.id]
               const cs=(c.likes_count||0)-(c.dislikes_count||0)
+              const isReply=!!c.parent_id
+              const parentCmt=isReply?postComments.find((x:any)=>x.id===c.parent_id):null
               return(
-                <div key={c.id} style={{padding:'12px 16px',borderBottom:'1px solid '+C.border,display:'flex',gap:'10px'}}>
-                  <div style={{width:'34px',height:'34px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.8rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:'0.88rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
-                    <div style={{fontSize:'0.92rem',margin:'4px 0'}}>{c.text}</div>
-                  </div>
-                  <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:'2px',minWidth:'28px'}}>
-                    <button onClick={()=>voteComment(c,'up')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='up'?C.upvote:C.muted,padding:'2px',display:'flex'}}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill={cmv==='up'?C.upvote:'none'} stroke={cmv==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-                    </button>
-                    <span style={{fontWeight:700,fontSize:'0.82rem',color:cs>0?C.upvote:cs<0?C.red:C.muted}}>{cs}</span>
-                    <button onClick={()=>voteComment(c,'down')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='down'?C.red:C.muted,padding:'2px',display:'flex'}}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill={cmv==='down'?C.red:'none'} stroke={cmv==='down'?C.red:'currentColor'} strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                    </button>
+                <div key={c.id} style={{padding:'10px 16px',borderBottom:'1px solid '+C.border,paddingLeft:isReply?'36px':'16px'}}>
+                  {isReply&&parentCmt&&(
+                    <div style={{fontSize:'0.75rem',color:C.muted,marginBottom:'4px',display:'flex',alignItems:'center',gap:'4px'}}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
+                      replying to {parentCmt.profiles?.username||'User'}
+                    </div>
+                  )}
+                  <div style={{display:'flex',gap:'10px'}}>
+                    <div style={{width:'32px',height:'32px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.78rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:'0.88rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
+                      <div style={{fontSize:'0.92rem',margin:'4px 0'}}>{c.text}</div>
+                      {c.images&&c.images.length>0&&(
+                        <div style={{display:'grid',gridTemplateColumns:c.images.length===1?'1fr':'1fr 1fr',gap:'3px',borderRadius:'8px',overflow:'hidden',marginBottom:'6px',maxWidth:'260px'}}>
+                          {c.images.slice(0,4).map((url:string,i:number)=><img key={i} src={url} alt="" style={{width:'100%',height:c.images.length===1?'160px':'90px',objectFit:'cover'}}/>)}
+                        </div>
+                      )}
+                      <div style={{display:'flex',gap:'10px',marginTop:'4px',alignItems:'center'}}>
+                        <button onClick={()=>voteComment(c,'up')} style={{display:'flex',alignItems:'center',gap:'2px',background:'none',border:'none',cursor:'pointer',color:cmv==='up'?C.upvote:C.muted,fontSize:'0.78rem',padding:0}}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill={cmv==='up'?C.upvote:'none'} stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+                          {c.likes_count||0}
+                        </button>
+                        <button onClick={()=>voteComment(c,'down')} style={{display:'flex',alignItems:'center',gap:'2px',background:'none',border:'none',cursor:'pointer',color:cmv==='down'?C.red:C.muted,fontSize:'0.78rem',padding:0}}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill={cmv==='down'?C.red:'none'} stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                          {c.dislikes_count||0}
+                        </button>
+                        <button onClick={()=>setReplyToComment(c)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,fontFamily:'inherit'}}>Reply</button>
+                        <button onClick={()=>{setRepostTarget({...selectedPost,text:c.text,is_anon:false,profiles:c.profiles,user_id:c.user_id,created_at:c.created_at} as any);setShowRepost(true)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,display:'flex',alignItems:'center'}}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                        </button>
+                        {c.user_id!==profile.id&&(
+                          <button onClick={()=>{setDmTarget({...selectedPost,user_id:c.user_id,profiles:c.profiles} as any);setShowDm(true)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,display:'flex',alignItems:'center'}}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
             })}
           </div>
-          <div style={{padding:'10px 16px',borderTop:'1px solid '+C.border,background:C.bg,display:'flex',gap:'8px',alignItems:'center'}}>
-            <input style={{flex:1,background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder="Add a comment..." value={cmtInput} onChange={e=>setCmtInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitNewCmt()} />
-            <button onClick={submitNewCmt} style={{padding:'10px 18px',background:C.accentBright,color:'white',border:'none',borderRadius:'24px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Post</button>
+          <div style={{borderTop:'1px solid '+C.border,background:C.bg}}>
+            {replyToComment&&(
+              <div style={{padding:'6px 16px 0',display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:'0.8rem',color:C.muted}}>
+                <span>↩ Replying to {replyToComment.profiles?.username||'User'}</span>
+                <button onClick={()=>setReplyToComment(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1rem',padding:0}}>×</button>
+              </div>
+            )}
+            {cmtPrevs.length>0&&(
+              <div style={{display:'flex',gap:'6px',padding:'6px 16px 0',overflowX:'auto'}}>
+                {cmtPrevs.map((p,i)=><img key={i} src={p} alt="" style={{height:'60px',width:'60px',objectFit:'cover',borderRadius:'8px',flexShrink:0}}/>)}
+              </div>
+            )}
+            <div style={{padding:'8px 16px',display:'flex',gap:'8px',alignItems:'center'}}>
+              <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',flexShrink:0}}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+                <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickCmtImgs} />
+              </label>
+              <input style={{flex:1,background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder={replyToComment?`Reply to ${replyToComment.profiles?.username||'User'}…`:"Add a comment..."} value={cmtInput} onChange={e=>setCmtInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitNewCmt()} />
+              <button onClick={submitNewCmt} style={{padding:'10px 18px',background:C.accentBright,color:'white',border:'none',borderRadius:'24px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>Post</button>
+            </div>
           </div>
         </div>
       )}
