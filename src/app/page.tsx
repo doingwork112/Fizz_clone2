@@ -84,6 +84,8 @@ export default function App() {
   const [showDm,setShowDm]=useState(false)
   const [dmTarget,setDmTarget]=useState<Post|null>(null)
   const [dmMsg,setDmMsg]=useState('')
+  const [postComments,setPostComments]=useState<any[]>([])
+  const [cmtInput,setCmtInput]=useState('')
   const [commentVotes, setCommentVotes] = useState({})
   const [online, setOnline] = useState(0)
   const [searchQ, setSearchQ] = useState('')
