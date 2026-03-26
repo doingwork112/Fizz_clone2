@@ -182,6 +182,12 @@ export default function App() {
       if (type==='up') await sb.from('posts').update({likes_count: post.likes_count+1}).eq('id',post.id)
       else await sb.from('posts').update({dislikes_count: (post.dislikes_count||0)+1}).eq('id',post.id)
     }
+    const newMyVote = mv===type ? null : type
+    const newLikes = type==='up' ? (mv===type ? post.likes_count-1 : post.likes_count+(mv?0:1)) : (mv==='up' ? post.likes_count-1 : post.likes_count)
+    const newDislikes = type==='down' ? (mv===type ? (post.dislikes_count||0)-1 : (post.dislikes_count||0)+(mv?0:1)) : (mv==='down' ? (post.dislikes_count||0)-1 : (post.dislikes_count||0))
+    if(selectedPost&&selectedPost.id===post.id){
+      setSelectedPost(s=>s?{...s,my_vote:newMyVote,likes_count:Math.max(0,newLikes),dislikes_count:Math.max(0,newDislikes)}:null)
+    }
     loadPosts()
   }
 
