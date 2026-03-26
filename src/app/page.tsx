@@ -199,6 +199,8 @@ export default function App() {
     if(selectedPost&&selectedPost.id===post.id){
       setSelectedPost(s=>s?{...s,my_vote:newMyVote,likes_count:newLikes,dislikes_count:newDislikes}:null)
     }
+    // sync with db after 1 second
+    setTimeout(()=>loadPosts(),1000)
   }
 
   async function submitPost() {
