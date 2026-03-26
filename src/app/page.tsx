@@ -343,29 +343,7 @@ export default function App() {
   const sheet:React.CSSProperties={background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px',maxHeight:'92vh',overflowY:'auto'}
 
   // AUTH SCREEN
-  if(!session||!profile) return(
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
-      <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright}}>沸点</div>
-      <div style={{width:'100%',maxWidth:'360px'}}>
-        <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
-          {(['login','register'] as const).map(tab=>(
-            <div key={tab} onClick={()=>setAuthTab(tab)} style={{flex:1,padding:'10px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',background:authTab===tab?C.accentBright:'transparent',color:authTab===tab?'white':C.muted}}>
-              {tab==='login'?'登录':'注册'}
-            </div>
-          ))}
-        </div>
-        {authTab==='register'&&<>
-          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>昵称</label><input style={inp} placeholder="用户名" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} /></div>
-          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>学校</label><select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>{SCHOOLS.map(s=><option key={s}>{s}</option>)}</select></div>
-        </>}
-        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>邮箱</label><input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} /></div>
-        <div style={{marginBottom:'20px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>密码</label><input style={inp} type="password" placeholder="至少6位" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} /></div>
-        {authErr&&<div style={{background:'#fef2f2',border:'1px solid '+C.red,borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
-        <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit'}}>{authLoading?'...':authTab==='login'?'登录':'创建账号'}</button>
-        <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>{authTab==='login'?'还没有账号？':'已有账号？'}<span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>{authTab==='login'?'注册':'登录'}</span></div>
-      </div>
-    </div>
-  )
+
 
   // POST ROW - Fizz style: actions bottom-left, vote right
   function PostRow({p,compact}:{p:Post,compact?:boolean}){
@@ -435,6 +413,30 @@ export default function App() {
     )
   }
 
+
+    if(!session||!profile) return(
+    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
+      <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright}}>沸点</div>
+      <div style={{width:'100%',maxWidth:'360px'}}>
+        <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
+          {(['login','register'] as const).map(tab=>(
+            <div key={tab} onClick={()=>setAuthTab(tab)} style={{flex:1,padding:'10px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',background:authTab===tab?C.accentBright:'transparent',color:authTab===tab?'white':C.muted}}>
+              {tab==='login'?'登录':'注册'}
+            </div>
+          ))}
+        </div>
+        {authTab==='register'&&<>
+          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>昵称</label><input style={inp} placeholder="用户名" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} /></div>
+          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>学校</label><select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>{SCHOOLS.map(s=><option key={s}>{s}</option>)}</select></div>
+        </>}
+        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>邮箱</label><input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} /></div>
+        <div style={{marginBottom:'20px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>密码</label><input style={inp} type="password" placeholder="至少6位" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} /></div>
+        {authErr&&<div style={{background:'#fef2f2',border:'1px solid '+C.red,borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
+        <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit'}}>{authLoading?'...':authTab==='login'?'登录':'创建账号'}</button>
+        <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>{authTab==='login'?'还没有账号？':'已有账号？'}<span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>{authTab==='login'?'注册':'登录'}</span></div>
+      </div>
+    </div>
+  )
   const mktFiltered=mktCat==='all'?listings:listings.filter(l=>l.category===mktCat)
 
   return(
