@@ -593,6 +593,10 @@ export default function App() {
             </div>
             {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',marginBottom:'12px',borderRadius:'12px',overflow:'hidden'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'120px',objectFit:'cover'}}/>)}</div>}
             <div style={{display:'flex',alignItems:'center',paddingTop:'12px',borderTop:`1px solid ${C.border}`}}>
+              <label style={{cursor:'pointer',color:C.accentBright,display:'flex',alignItems:'center'}}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+                <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
+              </label>
               <label style={{display:'flex',alignItems:'center',gap:'7px',cursor:'pointer',fontSize:'0.9rem',fontWeight:600,color:postAnon?C.accentBright:C.muted}}>
                 <input type="checkbox" checked={postAnon} onChange={e=>setPostAnon(e.target.checked)} style={{accentColor:C.accentBright,width:'16px',height:'16px',cursor:'pointer'}} />
                 匿名发布
