@@ -88,6 +88,10 @@ export default function App() {
   const [replyToComment, setReplyToComment] = useState<any>(null)
   const [cmtImgs, setCmtImgs] = useState<File[]>([])
   const [cmtPrevs, setCmtPrevs] = useState<string[]>([])
+  const [repostIsComment, setRepostIsComment] = useState(false)
+  const [repostOriginalPostText, setRepostOriginalPostText] = useState('')
+  const [selectedMsg, setSelectedMsg] = useState<any>(null)
+  const [showChatMenu, setShowChatMenu] = useState(false)
 
   const [showPost, setShowPost] = useState(false)
   const [postText, setPostText] = useState('')
@@ -348,7 +352,7 @@ export default function App() {
     })
     // Increment reposts_count via security definer RPC (bypasses RLS)
     await sb.rpc('increment_reposts_count',{post_id:repostTarget.id})
-    setRepostText('');setShowRepost(false);setReposting(false);setRepostTarget(null)
+    setRepostText('');setShowRepost(false);setReposting(false);setRepostTarget(null);setRepostIsComment(false);setRepostOriginalPostText('')
     loadPosts()
   }
 
@@ -395,6 +399,24 @@ export default function App() {
     if (!profile||!chatTarget||!chatInput.trim()) return
     await sb.from('messages').insert({from_user_id:profile.id,to_user_id:chatTarget.id,text:chatInput.trim()})
     setChatInput(''); openChat(chatTarget); loadConvos()
+  }
+  async function recallMsg(msg: any) {
+    if (!profile||msg.from_user_id!==profile.id) return
+    const age = Date.now() - new Date(msg.created_at).getTime()
+    if (age > 2*60*1000) return // older than 2 min
+    await sb.from('messages').delete().eq('id', msg.id)
+    setChatMsgs(ms=>ms.filter(m=>m.id!==msg.id))
+    setSelectedMsg(null)
+  }
+  async function clearChat() {
+    if (!profile||!chatTarget) return
+    if (!confirm('确认删除与该用户的所有聊天记录？')) return
+    await sb.from('messages').delete()
+      .eq('from_user_id', profile.id)
+      .eq('to_user_id', chatTarget.id)
+    setChatMsgs(ms=>ms.filter(m=>m.from_user_id!==profile.id))
+    setShowChatMenu(false)
+    loadConvos()
   }
   useEffect(()=>{ chatRef.current?.scrollTo(0,chatRef.current.scrollHeight) },[chatMsgs])
 
@@ -602,18 +624,32 @@ export default function App() {
           ))
         ) : (
           <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const}}>
               <button onClick={()=>setChatTarget(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
               <div style={{width:'36px',height:'36px',borderRadius:'50%',background:chatTarget.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'white',fontSize:'0.88rem'}}>{chatTarget.avatar_initials}</div>
-              <div style={{fontWeight:700}}>{chatTarget.username}</div>
+              <div style={{fontWeight:700,flex:1}}>{chatTarget.username}</div>
+              <button onClick={()=>setShowChatMenu(v=>!v)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1.2rem',padding:'4px'}}>•••</button>
+              {showChatMenu&&(
+                <div style={{position:'absolute' as const,top:'52px',right:'12px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'4px',zIndex:600,boxShadow:`0 4px 16px ${C.shadow}`,minWidth:'150px'}}>
+                  <button onClick={clearChat} style={{width:'100%',padding:'10px 14px',background:'none',border:'none',color:C.red,cursor:'pointer',textAlign:'left' as const,fontFamily:'inherit',fontSize:'0.9rem',borderRadius:'8px'}}>🗑 删除聊天记录</button>
+                </div>
+              )}
             </div>
-            <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:'16px',display:'flex',flexDirection:'column',gap:'10px'}}>
+            <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:'16px',display:'flex',flexDirection:'column',gap:'10px'}} onClick={()=>{setSelectedMsg(null);setShowChatMenu(false)}}>
               {chatMsgs.map(m=>{
                 const mine = m.from_user_id===profile.id
+                const canRecall = mine && (Date.now()-new Date(m.created_at).getTime()) < 2*60*1000
+                const isSel = selectedMsg?.id===m.id
                 return (
                   <div key={m.id} style={{alignSelf:mine?'flex-end':'flex-start',maxWidth:'76%'}}>
-                    <div style={{padding:'10px 14px',borderRadius:'18px',fontSize:'0.92rem',lineHeight:'1.4',background:mine?C.accentBright:(resolved==='light'?'#e5e7eb':C.surface2),color:mine?'white':C.text,borderBottomRightRadius:mine?'4px':'18px',borderBottomLeftRadius:mine?'18px':'4px'}}>{m.text}</div>
+                    <div onClick={e=>{e.stopPropagation();mine&&setSelectedMsg(isSel?null:m)}} style={{padding:'10px 14px',borderRadius:'18px',fontSize:'0.92rem',lineHeight:'1.4',background:mine?C.accentBright:(resolved==='light'?'#e5e7eb':C.surface2),color:mine?'white':C.text,borderBottomRightRadius:mine?'4px':'18px',borderBottomLeftRadius:mine?'18px':'4px',cursor:mine?'pointer':'default'}}>{m.text}</div>
                     <div style={{fontSize:'0.7rem',color:C.muted,marginTop:'3px',textAlign:mine?'right':'left'}}>{ago(m.created_at)}</div>
+                    {isSel&&mine&&(
+                      <div style={{display:'flex',justifyContent:'flex-end',marginTop:'4px',gap:'6px'}}>
+                        {canRecall&&<button onClick={()=>recallMsg(m)} style={{background:C.red,color:'white',border:'none',borderRadius:'8px',padding:'4px 10px',fontSize:'0.75rem',cursor:'pointer',fontFamily:'inherit'}}>撤回</button>}
+                        {!canRecall&&<span style={{fontSize:'0.72rem',color:C.muted}}>超过2分钟无法撤回</span>}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -943,7 +979,7 @@ export default function App() {
                   )}
                   <div style={{display:'flex',gap:'10px'}}>
                     <div style={{width:'32px',height:'32px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.78rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:'0.88rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
                       <div style={{fontSize:'0.92rem',margin:'4px 0'}}>{c.text}</div>
                       {c.images&&c.images.length>0&&(
@@ -952,16 +988,8 @@ export default function App() {
                         </div>
                       )}
                       <div style={{display:'flex',gap:'10px',marginTop:'4px',alignItems:'center'}}>
-                        <button onClick={()=>voteComment(c,'up')} style={{display:'flex',alignItems:'center',gap:'2px',background:'none',border:'none',cursor:'pointer',color:cmv==='up'?C.upvote:C.muted,fontSize:'0.78rem',padding:0}}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill={cmv==='up'?C.upvote:'none'} stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
-                          {c.likes_count||0}
-                        </button>
-                        <button onClick={()=>voteComment(c,'down')} style={{display:'flex',alignItems:'center',gap:'2px',background:'none',border:'none',cursor:'pointer',color:cmv==='down'?C.red:C.muted,fontSize:'0.78rem',padding:0}}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill={cmv==='down'?C.red:'none'} stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                          {c.dislikes_count||0}
-                        </button>
                         <button onClick={()=>setReplyToComment(c)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,fontFamily:'inherit'}}>Reply</button>
-                        <button onClick={()=>{setRepostTarget({...selectedPost,text:c.text,is_anon:false,profiles:c.profiles,user_id:c.user_id,created_at:c.created_at} as any);setShowRepost(true)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,display:'flex',alignItems:'center'}}>
+                        <button onClick={()=>{setRepostTarget({...selectedPost,text:c.text,is_anon:false,profiles:c.profiles,user_id:c.user_id,created_at:c.created_at} as any);setRepostIsComment(true);setRepostOriginalPostText(selectedPost.text);setShowRepost(true)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,display:'flex',alignItems:'center'}}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
                         </button>
                         {c.user_id!==profile.id&&(
@@ -970,6 +998,16 @@ export default function App() {
                           </button>
                         )}
                       </div>
+                    </div>
+                    {/* vote col — same style as PostCard */}
+                    <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:'2px',minWidth:'28px',flexShrink:0}}>
+                      <button onClick={()=>voteComment(c,'up')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='up'?C.upvote:C.muted,padding:'2px',display:'flex'}}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={cmv==='up'?C.upvote:'none'} stroke={cmv==='up'?C.upvote:'currentColor'} strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+                      </button>
+                      <span style={{fontWeight:700,fontSize:'0.82rem',color:cs>0?C.upvote:cs<0?C.red:C.muted}}>{cs}</span>
+                      <button onClick={()=>voteComment(c,'down')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='down'?C.red:C.muted,padding:'2px',display:'flex'}}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={cmv==='down'?C.red:'none'} stroke={cmv==='down'?C.red:'currentColor'} strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1003,7 +1041,7 @@ export default function App() {
       {showRepost&&repostTarget&&(
         <div style={{position:'fixed',inset:0,background:C.bg,zIndex:500,display:'flex',flexDirection:'column' as const}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:'1px solid '+C.border}}>
-            <button onClick={()=>{setShowRepost(false);setRepostText('')}} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.3rem',color:C.text}}>✕</button>
+            <button onClick={()=>{setShowRepost(false);setRepostText('');setRepostIsComment(false);setRepostOriginalPostText('')}} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.3rem',color:C.text}}>✕</button>
             <button onClick={submitRepost} disabled={reposting} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'8px 20px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{reposting?'...':'Post'}</button>
           </div>
           <div style={{flex:1,overflowY:'auto' as const,padding:'16px'}}>
@@ -1021,6 +1059,11 @@ export default function App() {
                 <span style={{fontWeight:600,fontSize:'0.88rem'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</span>
                 <span style={{fontSize:'0.75rem',color:C.muted}}>{ago(repostTarget.created_at)}</span>
               </div>
+              {repostIsComment&&repostOriginalPostText&&(
+                <div style={{fontSize:'0.78rem',color:C.accentBright,marginBottom:'4px'}}>
+                  @Commenting on '{repostOriginalPostText.slice(0,40)}{repostOriginalPostText.length>40?'…':''}'
+                </div>
+              )}
               <div style={{fontSize:'0.92rem'}}>{repostTarget.text}</div>
             </div>
           </div>
