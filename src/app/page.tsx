@@ -421,19 +421,19 @@ export default function App() {
         <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
           {(['login','register'] as const).map(tab=>(
             <div key={tab} onClick={()=>setAuthTab(tab)} style={{flex:1,padding:'10px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',background:authTab===tab?C.accentBright:'transparent',color:authTab===tab?'white':C.muted}}>
-              {tab==='login'?'登录':'注册'}
+              {tab==='login'?'Login':'Register'}
             </div>
           ))}
         </div>
         {authTab==='register'&&<>
-          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>昵称</label><input style={inp} placeholder="用户名" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} /></div>
-          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>学校</label><select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>{SCHOOLS.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Username</label><input style={inp} placeholder="用户名" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} /></div>
+          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>School</label><select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>{SCHOOLS.map(s=><option key={s}>{s}</option>)}</select></div>
         </>}
-        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>邮箱</label><input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} /></div>
-        <div style={{marginBottom:'20px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>密码</label><input style={inp} type="password" placeholder="至少6位" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} /></div>
+        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Email</label><input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} /></div>
+        <div style={{marginBottom:'20px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Password</label><input style={inp} type="password" placeholder="6+ chars" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} /></div>
         {authErr&&<div style={{background:'#fef2f2',border:'1px solid '+C.red,borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
-        <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit'}}>{authLoading?'...':authTab==='login'?'登录':'创建账号'}</button>
-        <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>{authTab==='login'?'还没有账号？':'已有账号？'}<span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>{authTab==='login'?'注册':'登录'}</span></div>
+        <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit'}}>{authLoading?'...':authTab==='login'?'Login':'Create Account'}</button>
+        <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>{authTab==='login'?'No account?':'Have account?'}<span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>{authTab==='login'?'Register':'Login'}</span></div>
       </div>
     </div>
   )
