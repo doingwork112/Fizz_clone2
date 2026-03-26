@@ -32,6 +32,90 @@ function ago(ts:string){const d=Date.now()-new Date(ts).getTime();if(d<60000)ret
 function anonEmoji(uid:string){return EMOJIS[uid.charCodeAt(0)%EMOJIS.length]}
 function avColor(uid:string){return COLORS[uid.charCodeAt(0)%COLORS.length]}
 
+// POST ROW - Fizz style: actions bottom-left, vote right
+function PostRow({p,compact}:{p:Post,compact?:boolean}){
+  const isAnon=p.is_anon
+  const name=isAnon?'Anonymous':(p.profiles?.username||'User')
+  const mv=(p as any).my_vote
+  const score=p.likes_count-(p.dislikes_count||0)
+  const imgs=(p as any).images as string[]|undefined
+
+  return(
+    <div style={{borderBottom:'1px solid '+C.border,padding:'14px 16px 10px',background:C.bg,cursor:'pointer'}} onClick={()=>openPost(p)}>
+      <div style={{display:'flex',gap:'10px'}}>
+        <div style={{width:'40px',height:'40px',borderRadius:'50%',background:isAnon?avColor(p.user_id):(p.profiles?.avatar_color||avColor(p.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
+          {isAnon?anonEmoji(p.user_id):(p.profiles?.avatar_initials||'?')}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px'}}>
+            <span style={{fontWeight:600,fontSize:'0.92rem'}}>{name}</span>
+            <span style={{color:C.muted,fontSize:'0.8rem'}}>{ago(p.created_at)}</span>
+            {isAnon&&<span style={{fontSize:'0.7rem',color:C.muted,fontWeight:600}}>{p.school}</span>}
+          </div>
+          {p.text&&<div style={{fontSize:'0.95rem',lineHeight:'1.5',color:C.text,marginBottom:imgs&&imgs.length>0?'10px':'0'}}>{p.text}</div>}
+          {imgs&&imgs.length>0&&(
+            <div style={{display:'grid',gridTemplateColumns:imgs.length===1?'1fr':'1fr 1fr',gap:'3px',borderRadius:'12px',overflow:'hidden',marginTop:'8px'}}>
+              {imgs.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:imgs.length===1?'220px':'130px',objectFit:'cover',display:'block'}}/>)}
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'36px'}} onClick={e=>e.stopPropagation()}>
+          <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',color:mv==='up'?C.upvote:C.muted,display:'flex',alignItems:'center'}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <span style={{fontWeight:700,fontSize:'1rem',color:score>0?C.upvote:score<0?C.red:C.muted,lineHeight:1}}>{score}</span>
+          <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',color:mv==='down'?C.red:C.muted,display:'flex',alignItems:'center'}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'10px',paddingLeft:'50px'}} onClick={e=>e.stopPropagation()}>
+        <button onClick={()=>{setDmPostTarget(p);setShowDmPost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+        <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span>{p.comments_count||0}</span>
+        </button>
+        <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          <span>{(p as any).reposts_count||0}</span>
+        </button>
+        <button style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
+        <span style={{color:C.muted,fontSize:'1rem',cursor:'pointer'}}>···</span>
+        {p.user_id===profile.id&&<button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.8rem',padding:0,marginLeft:'auto'}}>Delete</button>}
+      </div>
+    </div>
+  )
+}
+
+
+if(!session||!profile) return(
+  <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:'DM Sans,-apple-system,sans-serif'}}>
+    <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright}}>沸点</div>
+    <div style={{width:'100%',maxWidth:'360px'}}>
+      <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
+        {(['login','register'] as const).map(tab=>(
+          <div key={tab} onClick={()=>setAuthTab(tab)} style={{flex:1,padding:'10px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',background:authTab===tab?C.accentBright:'transparent',color:authTab===tab?'white':C.muted}}>
+            {tab==='login'?'Login':'Register'}
+          </div>
+        ))}
+      </div>
+      {authTab==='register'&&<>
+        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Username</label><input style={inp} placeholder="用户名" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} /></div>
+        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>School</label><select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>{SCHOOLS.map(s=><option key={s}>{s}</option>)}</select></div>
+      </>}
+      <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Email</label><input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} /></div>
+      <div style={{marginBottom:'20px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Password</label><input style={inp} type="password" placeholder="6+ chars" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} /></div>
+      {authErr&&<div style={{background:'#fef2f2',border:'1px solid '+C.red,borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
+      <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit'}}>{authLoading?'...':authTab==='login'?'Login':'Create Account'}</button>
+      <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>{authTab==='login'?'No account?':'Have account?'}<span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>{authTab==='login'?'Register':'Login'}</span></div>
+    </div>
+  </div>
+)
+
 export default function App() {
   const sb = createClient()
   const {theme,setTheme,resolved} = useTheme()
@@ -345,89 +429,6 @@ export default function App() {
   // AUTH SCREEN
 
 
-  // POST ROW - Fizz style: actions bottom-left, vote right
-  function PostRow({p,compact}:{p:Post,compact?:boolean}){
-    const isAnon=p.is_anon
-    const name=isAnon?'Anonymous':(p.profiles?.username||'User')
-    const mv=(p as any).my_vote
-    const score=p.likes_count-(p.dislikes_count||0)
-    const imgs=(p as any).images as string[]|undefined
-
-    return(
-      <div style={{borderBottom:'1px solid '+C.border,padding:'14px 16px 10px',background:C.bg,cursor:'pointer'}} onClick={()=>openPost(p)}>
-        <div style={{display:'flex',gap:'10px'}}>
-          <div style={{width:'40px',height:'40px',borderRadius:'50%',background:isAnon?avColor(p.user_id):(p.profiles?.avatar_color||avColor(p.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
-            {isAnon?anonEmoji(p.user_id):(p.profiles?.avatar_initials||'?')}
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px'}}>
-              <span style={{fontWeight:600,fontSize:'0.92rem'}}>{name}</span>
-              <span style={{color:C.muted,fontSize:'0.8rem'}}>{ago(p.created_at)}</span>
-              {isAnon&&<span style={{fontSize:'0.7rem',color:C.muted,fontWeight:600}}>{p.school}</span>}
-            </div>
-            {p.text&&<div style={{fontSize:'0.95rem',lineHeight:'1.5',color:C.text,marginBottom:imgs&&imgs.length>0?'10px':'0'}}>{p.text}</div>}
-            {imgs&&imgs.length>0&&(
-              <div style={{display:'grid',gridTemplateColumns:imgs.length===1?'1fr':'1fr 1fr',gap:'3px',borderRadius:'12px',overflow:'hidden',marginTop:'8px'}}>
-                {imgs.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:imgs.length===1?'220px':'130px',objectFit:'cover',display:'block'}}/>)}
-              </div>
-            )}
-          </div>
-          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'36px'}} onClick={e=>e.stopPropagation()}>
-            <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',color:mv==='up'?C.upvote:C.muted,display:'flex',alignItems:'center'}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-            </button>
-            <span style={{fontWeight:700,fontSize:'1rem',color:score>0?C.upvote:score<0?C.red:C.muted,lineHeight:1}}>{score}</span>
-            <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',color:mv==='down'?C.red:C.muted,display:'flex',alignItems:'center'}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-          </div>
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'10px',paddingLeft:'50px'}} onClick={e=>e.stopPropagation()}>
-          <button onClick={()=>{setDmPostTarget(p);setShowDmPost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
-          <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-            <span>{p.comments_count||0}</span>
-          </button>
-          <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-            <span>{(p as any).reposts_count||0}</span>
-          </button>
-          <button style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-          </button>
-          <span style={{color:C.muted,fontSize:'1rem',cursor:'pointer'}}>···</span>
-          {p.user_id===profile.id&&<button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.8rem',padding:0,marginLeft:'auto'}}>Delete</button>}
-        </div>
-      </div>
-    )
-  }
-
-
-  if(!session||!profile) return(
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:'DM Sans,-apple-system,sans-serif'}}>
-      <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright}}>沸点</div>
-      <div style={{width:'100%',maxWidth:'360px'}}>
-        <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
-          {(['login','register'] as const).map(tab=>(
-            <div key={tab} onClick={()=>setAuthTab(tab)} style={{flex:1,padding:'10px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',background:authTab===tab?C.accentBright:'transparent',color:authTab===tab?'white':C.muted}}>
-              {tab==='login'?'Login':'Register'}
-            </div>
-          ))}
-        </div>
-        {authTab==='register'&&<>
-          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Username</label><input style={inp} placeholder="用户名" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} /></div>
-          <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>School</label><select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>{SCHOOLS.map(s=><option key={s}>{s}</option>)}</select></div>
-        </>}
-        <div style={{marginBottom:'12px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Email</label><input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} /></div>
-        <div style={{marginBottom:'20px'}}><label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px'}}>Password</label><input style={inp} type="password" placeholder="6+ chars" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} /></div>
-        {authErr&&<div style={{background:'#fef2f2',border:'1px solid '+C.red,borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
-        <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit'}}>{authLoading?'...':authTab==='login'?'Login':'Create Account'}</button>
-        <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>{authTab==='login'?'No account?':'Have account?'}<span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>{authTab==='login'?'Register':'Login'}</span></div>
-      </div>
-    </div>
-  )
   const mktFiltered=mktCat==='all'?listings:listings.filter(l=>l.category===mktCat)
 
   return(
