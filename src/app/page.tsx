@@ -194,12 +194,11 @@ export default function App() {
     }
     newLikes = Math.max(0, newLikes)
     newDislikes = Math.max(0, newDislikes)
-    // optimistic update
+    // optimistic update - update UI immediately
     setPosts(ps=>ps.map(p=>p.id===post.id?{...p,my_vote:newMyVote,likes_count:newLikes,dislikes_count:newDislikes}:p))
     if(selectedPost&&selectedPost.id===post.id){
       setSelectedPost(s=>s?{...s,my_vote:newMyVote,likes_count:newLikes,dislikes_count:newDislikes}:null)
     }
-    loadPosts()
   }
 
   async function submitPost() {
