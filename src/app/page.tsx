@@ -148,10 +148,22 @@ export default function App() {
   async function vote(post: Post, type: 'up'|'down') {
     if (!profile) return
     const mv = (post as any).my_vote
-    if (mv===type) { await sb.from('fizzups').delete().eq('post_id',post.id).eq('user_id',profile.id) }
-    else {
-      if (mv) await sb.from('fizzups').delete().eq('post_id',post.id).eq('user_id',profile.id)
+    if (mv===type) {
+      // undo vote
+      await sb.from('fizzups').delete().eq('post_id',post.id).eq('user_id',profile.id)
+      if (type==='up') await sb.from('posts').update({likes_count: Math.max(0, post.likes_count-1)}).eq('id',post.id)
+      else await sb.from('posts').update({dislikes_count: Math.max(0, (post.dislikes_count||0)-1)}).eq('id',post.id)
+    } else {
+      // remove old vote if exists
+      if (mv) {
+        await sb.from('fizzups').delete().eq('post_id',post.id).eq('user_id',profile.id)
+        if (mv==='up') await sb.from('posts').update({likes_count: Math.max(0, post.likes_count-1)}).eq('id',post.id)
+        else await sb.from('posts').update({dislikes_count: Math.max(0, (post.dislikes_count||0)-1)}).eq('id',post.id)
+      }
+      // add new vote
       await sb.from('fizzups').insert({post_id:post.id,user_id:profile.id,vote_type:type})
+      if (type==='up') await sb.from('posts').update({likes_count: post.likes_count+1}).eq('id',post.id)
+      else await sb.from('posts').update({dislikes_count: (post.dislikes_count||0)+1}).eq('id',post.id)
     }
     loadPosts()
   }
