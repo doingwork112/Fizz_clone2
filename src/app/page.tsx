@@ -66,6 +66,17 @@ export default function App() {
   const [chatInput, setChatInput] = useState('')
   const [unread, setUnread] = useState(0)
   const [showRepost, setShowRepost] = useState(false)
+  const [selectedPost, setSelectedPost] = useState(null)
+
+  function openPost(p){
+    setSelectedPost(p)
+    if(!openCmts[p.id]){
+      sb.from('comments').select('*,profiles(*)').eq('post_id',p.id).order('created_at').then(({data})=>{
+        setOpenCmts(x=>({...x,[p.id]:data||[]}))
+        if(data&&data.length>0) loadCommentVotes(data)
+      })
+    }
+  }
   const [repostTarget, setRepostTarget] = useState(null)
   const [repostText, setRepostText] = useState('')
   const [repostAnon, setRepostAnon] = useState(true)
@@ -325,7 +336,7 @@ export default function App() {
             <span style={{color:C.muted,fontSize:'0.8rem'}}>{ago(p.created_at)}</span>
             {p.is_hot && <span style={{background:'#fef3c7',color:'#d97706',borderRadius:'4px',padding:'1px 6px',fontSize:'0.68rem',fontWeight:700}}>🔥 HOT</span>}
           </div>
-          <div style={{fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{p.text}</div>
+          <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{p.text}</div>
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {/* action row */}
           <div style={{display:'flex',alignItems:'center',gap:'14px',marginTop:'10px',color:C.muted}}>
@@ -745,6 +756,85 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {selectedPost&&(
+        <div style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky',top:0,background:C.bg}}>
+            <button onClick={()=>{setSelectedPost(null);loadPosts()}} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
+            <div style={{fontWeight:700}}>Post</div>
+          </div>
+          <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
+            <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
+              <div style={{width:'40px',height:'40px',borderRadius:'50%',background:selectedPost.is_anon?avColor(selectedPost.user_id):(selectedPost.profiles?.avatar_color||avColor(selectedPost.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
+                {selectedPost.is_anon?anonEmoji(selectedPost.user_id):(selectedPost.profiles?.avatar_initials||'?')}
+              </div>
+              <div>
+                <div style={{fontWeight:600}}>{selectedPost.is_anon?'Anonymous':(selectedPost.profiles?.username||'User')}</div>
+                <div style={{fontSize:'0.78rem',color:C.muted}}>{ago(selectedPost.created_at)}</div>
+              </div>
+            </div>
+            <div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'16px'}}>{selectedPost.text}</div>
+            {selectedPost.images&&selectedPost.images.length>0&&(
+              <div style={{display:'grid',gridTemplateColumns:selectedPost.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginBottom:'16px',borderRadius:'12px',overflow:'hidden'}}>
+                {selectedPost.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:selectedPost.images.length===1?'280px':'160px',objectFit:'cover'}}/>)}
+              </div>
+            )}
+            <div style={{display:'flex',gap:'14px',paddingBottom:'16px',borderBottom:'1px solid '+C.border}}>
+              <button onClick={()=>vote(selectedPost,'up')} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',cursor:'pointer',color:(selectedPost.my_vote)==='up'?C.upvote:C.muted,padding:0}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={(selectedPost.my_vote)==='up'?C.upvote:'none'} stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+                {selectedPost.likes_count}
+              </button>
+              <button onClick={()=>vote(selectedPost,'down')} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',cursor:'pointer',color:(selectedPost.my_vote)==='down'?C.red:C.muted,padding:0}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={(selectedPost.my_vote)==='down'?C.red:'none'} stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                {selectedPost.dislikes_count||0}
+              </button>
+            </div>
+            <div style={{marginTop:'16px'}}>
+              <div style={{fontWeight:700,marginBottom:'12px'}}>Comments</div>
+              {(openCmts[selectedPost.id]||[]).length===0&&<div style={{color:C.muted,textAlign:'center',padding:'30px 0'}}>No comments yet. Start the conversation!</div>}
+              {(openCmts[selectedPost.id]||[]).map(c=>(
+                <div key={c.id} style={{display:'flex',gap:'10px',marginBottom:'16px'}}>
+                  <div style={{width:'32px',height:'32px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.78rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:'0.85rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
+                    <div style={{fontSize:'0.9rem',margin:'3px 0'}}>{c.text}</div>
+                    <div style={{display:'flex',gap:'12px',marginTop:'4px'}}>
+                      <button onClick={()=>voteComment(c,'up')} style={{display:'flex',alignItems:'center',gap:'3px',background:'none',border:'none',cursor:'pointer',color:commentVotes[c.id]==='up'?C.upvote:C.muted,fontSize:'0.8rem',padding:0}}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill={commentVotes[c.id]==='up'?C.upvote:'none'} stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+                        {c.likes_count||0}
+                      </button>
+                      <button onClick={()=>voteComment(c,'down')} style={{display:'flex',alignItems:'center',gap:'3px',background:'none',border:'none',cursor:'pointer',color:commentVotes[c.id]==='down'?C.red:C.muted,fontSize:'0.8rem',padding:0}}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill={commentVotes[c.id]==='down'?C.red:'none'} stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                        {c.dislikes_count||0}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{padding:'12px 16px',borderTop:'1px solid '+C.border,display:'flex',gap:'8px',background:C.bg}}>
+            <input style={{flex:1,background:C.surface,border:'1px solid '+C.border,borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder="Add a comment..." value={cmtInputs[selectedPost.id]||''} onChange={e=>setCmtInputs(x=>({...x,[selectedPost.id]:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&submitCmt(selectedPost.id)} />
+            <button onClick={()=>submitCmt(selectedPost.id)} style={{padding:'10px 18px',background:C.accentBright,color:'white',border:'none',borderRadius:'24px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Post</button>
+          </div>
+        </div>
+      )}
+
+      {showRepost&&repostTarget&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:500,display:'flex',flexDirection:'column',justifyContent:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowRepost(false)}>
+          <div style={{background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+              <button onClick={()=>setShowRepost(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontFamily:'inherit'}}>Cancel</button>
+              <div style={{fontWeight:700}}>Repost</div>
+              <button onClick={submitRepost} disabled={reposting} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{reposting?'...':'Post'}</button>
+            </div>
+            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none',color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'12px'}} placeholder="Add a comment..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
+            <div style={{background:C.surface,borderRadius:'12px',padding:'12px',borderLeft:'3px solid '+C.accentBright}}>
+              <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'4px'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</div>
+              <div style={{fontSize:'0.9rem'}}>{repostTarget.text}</div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
