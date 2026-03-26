@@ -356,11 +356,9 @@ export default function App() {
     return(
       <div style={{borderBottom:'1px solid '+C.border,padding:'14px 16px 10px',background:C.bg,cursor:'pointer'}} onClick={()=>openPost(p)}>
         <div style={{display:'flex',gap:'10px'}}>
-          {/* avatar */}
           <div style={{width:'40px',height:'40px',borderRadius:'50%',background:isAnon?avColor(p.user_id):(p.profiles?.avatar_color||avColor(p.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
             {isAnon?anonEmoji(p.user_id):(p.profiles?.avatar_initials||'?')}
           </div>
-          {/* content */}
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px'}}>
               <span style={{fontWeight:600,fontSize:'0.92rem'}}>{name}</span>
@@ -374,7 +372,6 @@ export default function App() {
               </div>
             )}
           </div>
-          {/* vote col - right side like real Fizz */}
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'36px'}} onClick={e=>e.stopPropagation()}>
             <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',color:mv==='up'?C.upvote:C.muted,display:'flex',alignItems:'center'}}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
@@ -385,27 +382,21 @@ export default function App() {
             </button>
           </div>
         </div>
-        {/* action bar - bottom, like real Fizz */}
         <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'10px',paddingLeft:'50px'}} onClick={e=>e.stopPropagation()}>
-          {/* dm / paper plane */}
           <button onClick={()=>{setDmPostTarget(p);setShowDmPost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
-          {/* comment */}
           <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
             <span>{p.comments_count||0}</span>
           </button>
-          {/* repost */}
           <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
             <span>{(p as any).reposts_count||0}</span>
           </button>
-          {/* share */}
           <button style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.82rem',padding:0}}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
           </button>
-          {/* more */}
           <span style={{color:C.muted,fontSize:'1rem',cursor:'pointer'}}>···</span>
           {p.user_id===profile.id&&<button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.8rem',padding:0,marginLeft:'auto'}}>Delete</button>}
         </div>
@@ -441,8 +432,6 @@ export default function App() {
 
   return(
     <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:'DM Sans,-apple-system,sans-serif',maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'64px'}}>
-
-      {/* ===== FEED ===== */}
       {page==='feed'&&<>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:'1px solid '+C.border}}>
           <div style={{display:'flex',alignItems:'center',gap:'8px',fontWeight:700,fontSize:'1rem'}}>
@@ -469,8 +458,6 @@ export default function App() {
           <span style={{fontSize:'1.2rem',fontWeight:400}}>+</span> Post
         </button>
       </>}
-
-      {/* ===== MESSAGES ===== */}
       {page==='messages'&&<>
         <div style={{padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:'1px solid '+C.border,fontWeight:700,fontSize:'1.1rem'}}>Messages</div>
         <div style={{display:'flex',borderBottom:'1px solid '+C.border}}>
@@ -520,8 +507,6 @@ export default function App() {
           </div>
         )}
       </>}
-
-      {/* ===== SEARCH ===== */}
       {page==='search'&&<>
         <div style={{padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:'1px solid '+C.border}}>
           <div style={{display:'flex',alignItems:'center',gap:'10px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'24px',padding:'10px 16px'}}>
@@ -540,8 +525,6 @@ export default function App() {
           ))}
         </div>}
       </>}
-
-      {/* ===== MARKET ===== */}
       {page==='market'&&<>
         <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:'1px solid '+C.border}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'20px',padding:'8px 14px'}}>
@@ -572,8 +555,6 @@ export default function App() {
         {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>No listings yet</div>}
         <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'72px',right:'16px',background:C.accent,color:'white',border:'none',borderRadius:'28px',padding:'13px 24px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:'0 4px 16px '+C.shadow,zIndex:150}}>+ List</button>
       </>}
-
-      {/* ===== PROFILE ===== */}
       {page==='profile'&&<>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:'1px solid '+C.border}}>
           <div style={{fontWeight:700,fontSize:'1.05rem'}}>My Profile ▾</div>
@@ -598,8 +579,6 @@ export default function App() {
         {posts.every(p=>p.user_id!==profile.id)&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'60px 20px',gap:'12px',color:C.muted}}><div style={{fontSize:'2.5rem',opacity:.4}}>✏️</div><div style={{fontWeight:700,color:C.text}}>No posts yet.</div></div>}
         <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'72px',right:'16px',background:C.accent,color:'white',border:'none',borderRadius:'28px',padding:'13px 24px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:'0 4px 16px '+C.shadow,zIndex:150}}>+ Post</button>
       </>}
-
-      {/* ===== BOTTOM NAV ===== */}
       <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:'1px solid '+C.border,display:'flex',zIndex:200,paddingBottom:'env(safe-area-inset-bottom)'}}>
         {[
           {id:'feed',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
@@ -613,17 +592,12 @@ export default function App() {
           </button>
         ))}
       </nav>
-
-      {/* ===== POST DETAIL (full screen) ===== */}
       {selectedPost&&(
         <div style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column'}}>
-          {/* header */}
           <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky',top:0,background:C.bg}}>
             <button onClick={()=>setSelectedPost(null)} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem'}}>←</button>
           </div>
-          {/* scrollable content */}
           <div style={{flex:1,overflowY:'auto'}}>
-            {/* post body */}
             <div style={{padding:'16px',borderBottom:'1px solid '+C.border}}>
               <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
                 <div style={{width:'42px',height:'42px',borderRadius:'50%',background:selectedPost.is_anon?avColor(selectedPost.user_id):(selectedPost.profiles?.avatar_color||avColor(selectedPost.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
@@ -640,7 +614,6 @@ export default function App() {
                   {(selectedPost as any).images.slice(0,4).map((url:string,i:number)=><img key={i} src={url} alt="" style={{width:'100%',height:(selectedPost as any).images.length===1?'280px':'160px',objectFit:'cover',display:'block'}}/>)}
                 </div>
               )}
-              {/* vote + actions */}
               <div style={{display:'flex',alignItems:'center',gap:'16px',paddingTop:'10px',borderTop:'1px solid '+C.border}}>
                 <button onClick={()=>{setDmPostTarget(selectedPost);setShowDmPost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -663,7 +636,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-            {/* comments */}
             <div style={{padding:'12px 16px 8px',borderBottom:'1px solid '+C.border}}>
               <div style={{fontSize:'0.85rem',color:C.muted,fontWeight:600}}>Newest first ▾</div>
             </div>
@@ -694,7 +666,6 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    {/* comment vote */}
                     <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'30px'}}>
                       <button onClick={()=>voteComment(c,'up')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='up'?C.upvote:C.muted,padding:'2px',display:'flex',alignItems:'center'}}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill={cmv==='up'?C.upvote:'none'} stroke={cmv==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
@@ -709,7 +680,6 @@ export default function App() {
               )
             })}
           </div>
-          {/* comment input */}
           <div style={{padding:'10px 16px',borderTop:'1px solid '+C.border,background:C.bg,display:'flex',gap:'8px',alignItems:'center'}}>
             <div style={{width:'32px',height:'32px',borderRadius:'50%',background:profile.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.8rem',fontWeight:700,color:'white',flexShrink:0}}>{profile.avatar_initials}</div>
             <input style={{flex:1,background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder="Add a comment..." value={cmtInput} onChange={e=>setCmtInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitCmt()} />
@@ -721,8 +691,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ===== COMPOSE POST ===== */}
       {showPost&&(
         <div style={overlay} onClick={e=>e.target===e.currentTarget&&setShowPost(false)}>
           <div style={sheet}>
@@ -764,8 +732,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ===== REPOST MODAL - like Fizz ===== */}
       {showRepost&&repostTarget&&(
         <div style={{position:'fixed',inset:0,background:C.bg,zIndex:500,display:'flex',flexDirection:'column'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:'1px solid '+C.border}}>
@@ -774,7 +740,6 @@ export default function App() {
             <button onClick={submitRepost} disabled={reposting} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'8px 20px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{reposting?'...':'Post'}</button>
           </div>
           <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
-            {/* who posting as */}
             <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
               <div style={{width:'40px',height:'40px',borderRadius:'50%',background:repostAnon?avColor(profile.id):profile.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700}}>{repostAnon?anonEmoji(profile.id):profile.avatar_initials}</div>
               <div style={{display:'flex',alignItems:'center',gap:'6px',background:C.surface,borderRadius:'20px',padding:'6px 12px',cursor:'pointer'}} onClick={()=>setRepostAnon(!repostAnon)}>
@@ -783,7 +748,6 @@ export default function App() {
               </div>
             </div>
             <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none',color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'16px'}} placeholder="Add ReFizz caption..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
-            {/* original post preview */}
             <div style={{border:'1px solid '+C.border,borderRadius:'14px',padding:'14px',background:C.surface}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
                 <div style={{width:'28px',height:'28px',borderRadius:'50%',background:repostTarget.is_anon?avColor(repostTarget.user_id):(repostTarget.profiles?.avatar_color||avColor(repostTarget.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',color:'white',fontWeight:700}}>{repostTarget.is_anon?anonEmoji(repostTarget.user_id):(repostTarget.profiles?.avatar_initials||'?')}</div>
@@ -796,7 +760,6 @@ export default function App() {
               )}
             </div>
           </div>
-          {/* bottom toolbar like Fizz */}
           <div style={{display:'flex',alignItems:'center',gap:'16px',padding:'12px 16px',borderTop:'1px solid '+C.border,background:C.bg}}>
             <label style={{cursor:'pointer',color:C.accentBright}}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
@@ -807,8 +770,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ===== DM FROM POST ===== */}
       {showDmPost&&dmPostTarget&&(
         <div style={overlay} onClick={e=>e.target===e.currentTarget&&setShowDmPost(false)}>
           <div style={sheet}>
@@ -825,8 +786,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ===== LISTING MODAL ===== */}
       {showListing&&(
         <div style={overlay} onClick={e=>e.target===e.currentTarget&&setShowListing(false)}>
           <div style={sheet}>
@@ -859,8 +818,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* ===== SETTINGS ===== */}
       {showSettings&&(
         <div style={overlay} onClick={e=>e.target===e.currentTarget&&setShowSettings(false)}>
           <div style={sheet}>
