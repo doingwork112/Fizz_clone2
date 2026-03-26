@@ -292,6 +292,65 @@ export default function App() {
     setOpenCmts(p=>({...p,[pid]:data||[]}))
   }
 
+  async function openPost(p:Post){
+    setSelectedPost(p)
+    setCmtInput('')
+    const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',p.id).order('created_at')
+    setPostComments(data||[])
+    if(data&&data.length>0&&profile){
+      const ids=data.map((c:any)=>c.id)
+      const{data:cv}=await sb.from('comment_votes').select('comment_id,vote_type').eq('user_id',profile.id).in('comment_id',ids)
+      const vm:Record<string,string>={}
+      cv?.forEach((v:any)=>vm[v.comment_id]=v.vote_type)
+      setCommentVotes(vm)
+    }
+  }
+
+  async function submitNewCmt(){
+    if(!profile||!cmtInput.trim()||!selectedPost)return
+    await sb.from('comments').insert({post_id:selectedPost.id,user_id:profile.id,text:cmtInput.trim()})
+    setCmtInput('')
+    const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',selectedPost.id).order('created_at')
+    setPostComments(data||[])
+    loadPosts()
+  }
+
+  async function voteComment(c:any,type:'up'|'down'){
+    if(!profile)return
+    const mv=commentVotes[c.id]
+    let nl=(c.likes_count||0),nd=(c.dislikes_count||0)
+    if(type==='up'){if(mv==='up')nl--;else{nl++;if(mv==='down')nd--}}
+    else{if(mv==='down')nd--;else{nd++;if(mv==='up')nl--}}
+    nl=Math.max(0,nl);nd=Math.max(0,nd)
+    const nv=mv===type?null:type
+    setCommentVotes(v=>({...v,[c.id]:nv}))
+    setPostComments(cs=>cs.map((x:any)=>x.id===c.id?{...x,likes_count:nl,dislikes_count:nd}:x))
+    if(mv===type){
+      await sb.from('comment_votes').delete().eq('comment_id',c.id).eq('user_id',profile.id)
+    } else {
+      if(mv)await sb.from('comment_votes').delete().eq('comment_id',c.id).eq('user_id',profile.id)
+      await sb.from('comment_votes').insert({comment_id:c.id,user_id:profile.id,vote_type:type})
+    }
+    if(type==='up')await sb.from('comments').update({likes_count:nl}).eq('id',c.id)
+    else await sb.from('comments').update({dislikes_count:nd}).eq('id',c.id)
+  }
+
+  async function submitRepost(){
+    if(!profile||!repostTarget)return
+    setReposting(true)
+    await sb.from('reposts').insert({user_id:profile.id,original_post_id:repostTarget.id,text:repostText.trim(),is_anon:repostAnon,school:profile.school})
+    await sb.from('posts').update({reposts_count:(repostTarget.reposts_count||0)+1}).eq('id',repostTarget.id)
+    setRepostText('');setShowRepost(false);setReposting(false);setRepostTarget(null)
+    loadPosts()
+  }
+
+  async function sendDm(){
+    if(!profile||!dmTarget||!dmMsg.trim())return
+    await sb.from('messages').insert({from_user_id:profile.id,to_user_id:dmTarget.user_id,text:dmMsg.trim()})
+    setDmMsg('');setShowDm(false);setDmTarget(null)
+    loadConvos()
+  }
+
   async function loadConvos() {
     if (!profile) return
     const { data: users } = await sb.from('profiles').select('*').neq('id',profile.id)
@@ -358,9 +417,16 @@ export default function App() {
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {/* action row */}
           <div style={{display:'flex',alignItems:'center',gap:'14px',marginTop:'10px',color:C.muted}}>
-            <button onClick={()=>toggleCmts(p.id)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
+            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
               {p.comments_count}
+            </button>
+            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+              {(p as any).reposts_count||0}
+            </button>
+            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
             <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
@@ -851,6 +917,123 @@ export default function App() {
               <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'4px'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</div>
               <div style={{fontSize:'0.9rem'}}>{repostTarget.text}</div>
             </div>
+          </div>
+        </div>
+      )}
+      {selectedPost&&(
+        <div style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column' as const}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky' as const,top:0,background:C.bg}}>
+            <button onClick={()=>setSelectedPost(null)} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
+            <span style={{fontWeight:700}}>Post</span>
+          </div>
+          <div style={{flex:1,overflowY:'auto' as const}}>
+            <div style={{padding:'16px',borderBottom:'1px solid '+C.border}}>
+              <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
+                <div style={{width:'40px',height:'40px',borderRadius:'50%',background:selectedPost.is_anon?avColor(selectedPost.user_id):(selectedPost.profiles?.avatar_color||avColor(selectedPost.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
+                  {selectedPost.is_anon?anonEmoji(selectedPost.user_id):(selectedPost.profiles?.avatar_initials||'?')}
+                </div>
+                <div>
+                  <div style={{fontWeight:600}}>{selectedPost.is_anon?'Anonymous':(selectedPost.profiles?.username||'User')}</div>
+                  <div style={{fontSize:'0.78rem',color:C.muted}}>{ago(selectedPost.created_at)}</div>
+                </div>
+              </div>
+              {selectedPost.text&&<div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'12px'}}>{selectedPost.text}</div>}
+              {(selectedPost as any).images&&(selectedPost as any).images.length>0&&(
+                <div style={{display:'grid',gridTemplateColumns:(selectedPost as any).images.length===1?'1fr':'1fr 1fr',gap:'3px',borderRadius:'12px',overflow:'hidden',marginBottom:'12px'}}>
+                  {(selectedPost as any).images.slice(0,4).map((url:string,i:number)=><img key={i} src={url} alt="" style={{width:'100%',height:(selectedPost as any).images.length===1?'260px':'150px',objectFit:'cover' as const}}/>)}
+                </div>
+              )}
+              <div style={{display:'flex',alignItems:'center',gap:'16px',paddingTop:'10px',borderTop:'1px solid '+C.border}}>
+                <button onClick={()=>{setDmTarget(selectedPost);setShowDm(true)}} style={{background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0,display:'flex',alignItems:'center'}}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+                <button onClick={()=>{setRepostTarget(selectedPost);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                  {(selectedPost as any).reposts_count||0}
+                </button>
+                <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'4px'}}>
+                  <button onClick={()=>vote(selectedPost,'up')} style={{background:'none',border:'none',cursor:'pointer',color:(selectedPost as any).my_vote==='up'?C.upvote:C.muted,padding:'2px',display:'flex'}}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill={(selectedPost as any).my_vote==='up'?C.upvote:'none'} stroke={(selectedPost as any).my_vote==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                  </button>
+                  <span style={{fontWeight:700,minWidth:'24px',textAlign:'center' as const,color:(selectedPost.likes_count-(selectedPost.dislikes_count||0))>0?C.upvote:C.muted}}>{selectedPost.likes_count-(selectedPost.dislikes_count||0)}</span>
+                  <button onClick={()=>vote(selectedPost,'down')} style={{background:'none',border:'none',cursor:'pointer',color:(selectedPost as any).my_vote==='down'?C.red:C.muted,padding:'2px',display:'flex'}}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill={(selectedPost as any).my_vote==='down'?C.red:'none'} stroke={(selectedPost as any).my_vote==='down'?C.red:'currentColor'} strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div style={{padding:'10px 16px 6px',borderBottom:'1px solid '+C.border,fontSize:'0.85rem',color:C.muted,fontWeight:600}}>Newest first</div>
+            {postComments.length===0&&<div style={{textAlign:'center' as const,padding:'40px',color:C.muted}}>No comments yet. Start the conversation!</div>}
+            {postComments.map((c:any)=>{
+              const cmv=commentVotes[c.id]
+              const cs=(c.likes_count||0)-(c.dislikes_count||0)
+              return(
+                <div key={c.id} style={{padding:'12px 16px',borderBottom:'1px solid '+C.border,display:'flex',gap:'10px'}}>
+                  <div style={{width:'34px',height:'34px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.8rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:'0.88rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
+                    <div style={{fontSize:'0.92rem',margin:'4px 0'}}>{c.text}</div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:'2px',minWidth:'28px'}}>
+                    <button onClick={()=>voteComment(c,'up')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='up'?C.upvote:C.muted,padding:'2px',display:'flex'}}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill={cmv==='up'?C.upvote:'none'} stroke={cmv==='up'?C.upvote:'currentColor'} strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                    </button>
+                    <span style={{fontWeight:700,fontSize:'0.82rem',color:cs>0?C.upvote:cs<0?C.red:C.muted}}>{cs}</span>
+                    <button onClick={()=>voteComment(c,'down')} style={{background:'none',border:'none',cursor:'pointer',color:cmv==='down'?C.red:C.muted,padding:'2px',display:'flex'}}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill={cmv==='down'?C.red:'none'} stroke={cmv==='down'?C.red:'currentColor'} strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{padding:'10px 16px',borderTop:'1px solid '+C.border,background:C.bg,display:'flex',gap:'8px',alignItems:'center'}}>
+            <input style={{flex:1,background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder="Add a comment..." value={cmtInput} onChange={e=>setCmtInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitNewCmt()} />
+            <button onClick={submitNewCmt} style={{padding:'10px 18px',background:C.accentBright,color:'white',border:'none',borderRadius:'24px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Post</button>
+          </div>
+        </div>
+      )}
+
+      {showRepost&&repostTarget&&(
+        <div style={{position:'fixed',inset:0,background:C.bg,zIndex:500,display:'flex',flexDirection:'column' as const}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:'1px solid '+C.border}}>
+            <button onClick={()=>{setShowRepost(false);setRepostText('')}} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.3rem',color:C.text}}>✕</button>
+            <button onClick={submitRepost} disabled={reposting} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'8px 20px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{reposting?'...':'Post'}</button>
+          </div>
+          <div style={{flex:1,overflowY:'auto' as const,padding:'16px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
+              <div style={{width:'40px',height:'40px',borderRadius:'50%',background:repostAnon?avColor(profile.id):profile.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700}}>{repostAnon?anonEmoji(profile.id):profile.avatar_initials}</div>
+              <div style={{display:'flex',alignItems:'center',gap:'6px',background:C.surface,borderRadius:'20px',padding:'6px 12px',cursor:'pointer'}} onClick={()=>setRepostAnon(!repostAnon)}>
+                <span style={{fontWeight:600,fontSize:'0.9rem'}}>{repostAnon?'Anonymous':profile.username}</span>
+                <span style={{color:C.muted}}>▾</span>
+              </div>
+            </div>
+            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none' as const,color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'16px'}} placeholder="Add ReFizz caption..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
+            <div style={{border:'1px solid '+C.border,borderRadius:'14px',padding:'14px',background:C.surface}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+                <div style={{width:'28px',height:'28px',borderRadius:'50%',background:repostTarget.is_anon?avColor(repostTarget.user_id):(repostTarget.profiles?.avatar_color||avColor(repostTarget.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',color:'white',fontWeight:700}}>{repostTarget.is_anon?anonEmoji(repostTarget.user_id):(repostTarget.profiles?.avatar_initials||'?')}</div>
+                <span style={{fontWeight:600,fontSize:'0.88rem'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</span>
+                <span style={{fontSize:'0.75rem',color:C.muted}}>{ago(repostTarget.created_at)}</span>
+              </div>
+              <div style={{fontSize:'0.92rem'}}>{repostTarget.text}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDm&&dmTarget&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:500,display:'flex',flexDirection:'column' as const,justifyContent:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowDm(false)}>
+          <div style={{background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+              <button onClick={()=>{setShowDm(false);setDmMsg('')}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontFamily:'inherit'}}>Cancel</button>
+              <div style={{fontWeight:700}}>Send Message</div>
+              <button onClick={sendDm} disabled={!dmMsg.trim()} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!dmMsg.trim()?.5:1}}>Send</button>
+            </div>
+            <div style={{background:C.surface,borderRadius:'12px',padding:'12px',marginBottom:'14px',borderLeft:'3px solid '+C.accentBright}}>
+              <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'4px'}}>To: {dmTarget.is_anon?'Anonymous':(dmTarget.profiles?.username||'User')}</div>
+              <div style={{fontSize:'0.9rem'}}>{dmTarget.text?.slice(0,100)}</div>
+            </div>
+            <textarea style={{width:'100%',background:C.surface,border:'1px solid '+C.border,borderRadius:'12px',padding:'12px',color:C.text,fontFamily:'inherit',fontSize:'0.95rem',outline:'none',minHeight:'80px',resize:'none' as const,lineHeight:'1.5'}} placeholder="Write a message..." value={dmMsg} onChange={e=>setDmMsg(e.target.value)} autoFocus />
           </div>
         </div>
       )}
