@@ -18,11 +18,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: '沸点',
   },
-  formatDetection: {
-    telephone: false,
-  },
   icons: {
-    apple: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
+    icon: '/icon-192.png',
   },
 }
 
@@ -30,10 +28,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh">
       <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="沸点" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body>{children}</body>
     </html>
