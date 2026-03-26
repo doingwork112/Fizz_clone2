@@ -415,7 +415,7 @@ export default function App() {
 
 
   if(!session||!profile) return(
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
+    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:'DM Sans,-apple-system,sans-serif'}}>
       <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright}}>沸点</div>
       <div style={{width:'100%',maxWidth:'360px'}}>
         <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
@@ -440,7 +440,7 @@ export default function App() {
   const mktFiltered=mktCat==='all'?listings:listings.filter(l=>l.category===mktCat)
 
   return(
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'64px'}}>
+    <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:'DM Sans,-apple-system,sans-serif',maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'64px'}}>
 
       {/* ===== FEED ===== */}
       {page==='feed'&&<>
