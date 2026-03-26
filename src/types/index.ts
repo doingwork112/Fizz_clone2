@@ -16,9 +16,14 @@ export interface Post {
   school: string
   likes_count: number
   dislikes_count: number
+  reposts_count: number
   comments_count: number
   is_hot: boolean
   poll: Poll | null
+  images: string[]
+  repost_of_id?: string | null
+  repost_of?: Post | null
+  my_vote?: string | null
   created_at: string
   profiles?: Profile
   has_fizzupped?: boolean
