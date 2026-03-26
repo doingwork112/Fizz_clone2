@@ -65,6 +65,12 @@ export default function App() {
   const [chatTarget, setChatTarget] = useState<Profile|null>(null)
   const [chatInput, setChatInput] = useState('')
   const [unread, setUnread] = useState(0)
+  const [showRepost, setShowRepost] = useState(false)
+  const [repostTarget, setRepostTarget] = useState(null)
+  const [repostText, setRepostText] = useState('')
+  const [repostAnon, setRepostAnon] = useState(true)
+  const [reposting, setReposting] = useState(false)
+  const [commentVotes, setCommentVotes] = useState({})
   const [online, setOnline] = useState(0)
   const [searchQ, setSearchQ] = useState('')
   const [searchRes, setSearchRes] = useState<Post[]>([])
@@ -225,6 +231,38 @@ export default function App() {
     setLUploading(false); loadListings()
   }
 
+  async function submitRepost(){
+    if(!profile||!repostTarget)return
+    setReposting(true)
+    await sb.from('reposts').insert({user_id:profile.id,original_post_id:repostTarget.id,text:repostText.trim(),is_anon:repostAnon,school:profile.school})
+    await sb.from('posts').update({reposts_count:(repostTarget.reposts_count||0)+1}).eq('id',repostTarget.id)
+    setRepostText('');setShowRepost(false);setReposting(false);setRepostTarget(null);loadPosts()
+  }
+
+  async function voteComment(comment, type){
+    if(!profile)return
+    const mv = commentVotes[comment.id]
+    if(mv===type){
+      await sb.from('comment_votes').delete().eq('comment_id',comment.id).eq('user_id',profile.id)
+      if(type==='up') await sb.from('comments').update({likes_count:Math.max(0,(comment.likes_count||0)-1)}).eq('id',comment.id)
+      else await sb.from('comments').update({dislikes_count:Math.max(0,(comment.dislikes_count||0)-1)}).eq('id',comment.id)
+      setCommentVotes(v=>({...v,[comment.id]:null}))
+    } else {
+      if(mv){
+        await sb.from('comment_votes').delete().eq('comment_id',comment.id).eq('user_id',profile.id)
+        if(mv==='up') await sb.from('comments').update({likes_count:Math.max(0,(comment.likes_count||0)-1)}).eq('id',comment.id)
+        else await sb.from('comments').update({dislikes_count:Math.max(0,(comment.dislikes_count||0)-1)}).eq('id',comment.id)
+      }
+      await sb.from('comment_votes').insert({comment_id:comment.id,user_id:profile.id,vote_type:type})
+      if(type==='up') await sb.from('comments').update({likes_count:(comment.likes_count||0)+1}).eq('id',comment.id)
+      else await sb.from('comments').update({dislikes_count:(comment.dislikes_count||0)+1}).eq('id',comment.id)
+      setCommentVotes(v=>({...v,[comment.id]:type}))
+    }
+    const pid=comment.post_id
+    const{data}=await sb.from('comments').select('*,profiles(*)').eq('post_id',pid).order('created_at')
+    setOpenCmts(p=>({...p,[pid]:data||[]}))
+  }
+
   async function loadConvos() {
     if (!profile) return
     const { data: users } = await sb.from('profiles').select('*').neq('id',profile.id)
@@ -295,8 +333,9 @@ export default function App() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
               {p.comments_count}
             </button>
-            <button style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
+            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+              {p.reposts_count||0}
             </button>
             <button style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
@@ -705,6 +744,7 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
       )}
     </div>
   )
