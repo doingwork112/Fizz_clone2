@@ -614,9 +614,9 @@ export default function App() {
             </div>
           ) : convos.map(({user:u,lastMsg})=>(
             <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
-              <div style={{width:'46px',height:'46px',borderRadius:'50%',background:u.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'white',flexShrink:0,fontSize:'0.95rem'}}>{u.avatar_initials}</div>
+              <div style={{width:'46px',height:'46px',borderRadius:'50%',background:avColor(u.id),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'1.4rem'}}>{anonEmoji(u.id)}</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:'0.95rem'}}>{u.username}</div>
+                <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
                 <div style={{fontSize:'0.85rem',color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lastMsg?.text||'开始对话'}</div>
               </div>
               {lastMsg&&<div style={{fontSize:'0.75rem',color:C.muted,flexShrink:0}}>{ago(lastMsg.created_at)}</div>}
@@ -626,8 +626,8 @@ export default function App() {
           <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const}}>
               <button onClick={()=>setChatTarget(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
-              <div style={{width:'36px',height:'36px',borderRadius:'50%',background:chatTarget.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'white',fontSize:'0.88rem'}}>{chatTarget.avatar_initials}</div>
-              <div style={{fontWeight:700,flex:1}}>{chatTarget.username}</div>
+              <div style={{width:'36px',height:'36px',borderRadius:'50%',background:avColor(chatTarget.id),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem'}}>{anonEmoji(chatTarget.id)}</div>
+              <div style={{fontWeight:700,flex:1}}>Anonymous</div>
               <button onClick={()=>setShowChatMenu(v=>!v)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1.2rem',padding:'4px'}}>•••</button>
               {showChatMenu&&(
                 <div style={{position:'absolute' as const,top:'52px',right:'12px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'4px',zIndex:600,boxShadow:`0 4px 16px ${C.shadow}`,minWidth:'150px'}}>
