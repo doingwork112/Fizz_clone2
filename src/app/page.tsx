@@ -467,6 +467,12 @@ export default function App() {
   }
   useEffect(()=>{ chatRef.current?.scrollTo(0,chatRef.current.scrollHeight) },[chatMsgs])
 
+  // Lock body scroll when any bottom sheet is open — prevents background feed from scrolling
+  useEffect(()=>{
+    document.documentElement.style.overflow = (showPost||showRepost) ? 'hidden' : ''
+    return ()=>{ document.documentElement.style.overflow = '' }
+  },[showPost,showRepost])
+
   useEffect(()=>{
     if (!searchQ.trim()) { setSearchRes([]); return }
     const t = setTimeout(async()=>{ const { data }=await sb.from('posts').select('*,profiles(*)').ilike('text',`%${searchQ}%`).limit(30); setSearchRes(data||[]) },300)
@@ -577,9 +583,10 @@ export default function App() {
       if (selectedPostRef.current) {
         if (dx > 8) swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
-          if (e.cancelable) e.preventDefault()   // separate from transform — works even when non-cancelable
+          if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
           if (postDetailRef.current) {
+            postDetailRef.current.style.animation = 'none'  // kill slide-in-right so transition works
             postDetailRef.current.style.transition = 'none'
             postDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
           }
@@ -592,6 +599,7 @@ export default function App() {
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
+          chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'none'
           chatDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
         }
@@ -619,10 +627,12 @@ export default function App() {
       // Chat detail: complete swipe-back or snap back
       if (chatDetailRef.current && chatTargetRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
-          chatDetailRef.current.style.transition = 'transform 0.25s ease'
+          chatDetailRef.current.style.animation = 'none'
+          chatDetailRef.current.style.transition = 'transform 0.28s ease'
           chatDetailRef.current.style.transform = 'translateX(100%)'
-          setTimeout(() => setChatTarget(null), 260)
+          setTimeout(() => setChatTarget(null), 290)
         } else {
+          chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'transform 0.25s ease'
           chatDetailRef.current.style.transform = 'translateX(0)'
           setTimeout(() => { if (chatDetailRef.current) chatDetailRef.current.style.transition = '' }, 260)
@@ -633,11 +643,13 @@ export default function App() {
       if (selectedPostRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           if (postDetailRef.current) {
-            postDetailRef.current.style.transition = 'transform 0.25s ease'
+            postDetailRef.current.style.animation = 'none'
+            postDetailRef.current.style.transition = 'transform 0.28s ease'
             postDetailRef.current.style.transform = 'translateX(100%)'
           }
-          setTimeout(() => setSelectedPost(null), 260)
+          setTimeout(() => setSelectedPost(null), 290)
         } else if (postDetailRef.current) {
+          postDetailRef.current.style.animation = 'none'
           postDetailRef.current.style.transition = 'transform 0.25s ease'
           postDetailRef.current.style.transform = 'translateX(0)'
           setTimeout(() => { if (postDetailRef.current) postDetailRef.current.style.transition = '' }, 260)
@@ -686,7 +698,7 @@ export default function App() {
     const cmtsOpen = !!openCmts[p.id]
 
     return (
-      <div style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg }}>
+      <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
         {/* avatar — wrapper div shows bg color while img loads, preventing flash */}
         <div style={{width:'44px',height:'44px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
           <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
@@ -722,7 +734,7 @@ export default function App() {
           )}
           {/* action row — matches Fizz: DM, Comment, Repost, Share, ••• */}
           {(() => { const ic = resolved==='light'?'#555':'#aaa'; return (
-          <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px'}}>
+          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px'}}>
             <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
