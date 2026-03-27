@@ -449,10 +449,26 @@ export default function App() {
   const overlay: React.CSSProperties = { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300, display:'flex', flexDirection:'column', justifyContent:'flex-end' }
   const sheet: React.CSSProperties = { background:C.bg, borderRadius:'20px 20px 0 0', padding:'20px 16px', maxHeight:'92vh', overflowY:'auto' }
 
+  // Lock/unlock body scroll for modals
+  function lockBody() {
+    scrollYBefore.current = window.scrollY
+    document.body.classList.add('modal-open')
+    document.body.style.top = `-${scrollYBefore.current}px`
+  }
+  function unlockBody() {
+    document.body.classList.remove('modal-open')
+    document.body.style.top = ''
+    window.scrollTo(0, scrollYBefore.current)
+  }
+
+  function openPostModal() {
+    lockBody()
+    openPostModal()
+  }
   function closePost() {
     setPostClosing(true)
     setPostDragY(0)
-    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]) }, 350)
+    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]); unlockBody() }, 350)
   }
 
   const FEED_TABS = ['Top',"Fizzin'",'New'] as const
@@ -460,12 +476,16 @@ export default function App() {
   // Use document-level touch listeners so swipe works EVERYWHERE (on posts, buttons, etc.)
   const swipeDx = useRef(0)
   const swipeDy = useRef(0)
+  const swipeLocked = useRef<'h'|'v'|null>(null)
+  const scrollYBefore = useRef(0)
   useEffect(() => {
     function onTS(e: TouchEvent) {
       touchStartY.current = e.touches[0].clientY
       touchStartX.current = e.touches[0].clientX
       swipeDx.current = 0
       swipeDy.current = 0
+      swipeLocked.current = null
+      scrollYBefore.current = window.scrollY
     }
     function onTM(e: TouchEvent) {
       if (page !== 'feed') return
@@ -473,30 +493,37 @@ export default function App() {
       const dx = e.touches[0].clientX - touchStartX.current
       swipeDx.current = dx
       swipeDy.current = dy
-      if (window.scrollY === 0 && dy > 0 && Math.abs(dy) > Math.abs(dx)) {
-        setPullY(Math.min(dy * 0.45, 72))
+      // Lock direction after 8px movement
+      if (!swipeLocked.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
       }
-      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      if (swipeLocked.current === 'h') {
+        e.preventDefault() // prevent vertical scroll during horizontal swipe
         setSwipeX(dx)
+      }
+      if (swipeLocked.current === 'v' && scrollYBefore.current === 0 && dy > 0) {
+        setPullY(Math.min(dy * 0.45, 72))
       }
     }
     async function onTE() {
       const dx = swipeDx.current
       const dy = swipeDy.current
+      const locked = swipeLocked.current
       setSwipeX(0)
       if (page === 'feed' && pullY > 52) {
         setRefreshing(true); setPullY(0)
         await loadPosts()
         setRefreshing(false)
       } else { setPullY(0) }
-      if (page === 'feed' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      if (page === 'feed' && locked === 'h' && Math.abs(dx) > 40) {
         const idx = FEED_TABS.indexOf(feedTab as any)
         if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
         if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
       }
+      swipeLocked.current = null
     }
     document.addEventListener('touchstart', onTS, { passive: true })
-    document.addEventListener('touchmove', onTM, { passive: true })
+    document.addEventListener('touchmove', onTM, { passive: false }) // non-passive so we can preventDefault for horizontal swipe
     document.addEventListener('touchend', onTE, { passive: true })
     return () => {
       document.removeEventListener('touchstart', onTS)
@@ -648,7 +675,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:600,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
     >
 
       {/* ─── FEED ─── */}
@@ -666,12 +693,12 @@ export default function App() {
         <div style={{background:C.bg,position:'sticky',top:'53px',zIndex:99,borderBottom:`1px solid ${C.border}`}}>
           <div style={{display:'flex',position:'relative'}}>
             {(['Top',"Fizzin'",'New'] as const).map(t=>(
-              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?800:600,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
+              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?900:700,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
                 {t}
               </div>
             ))}
-            {/* sliding indicator — follows finger */}
-            <div style={{position:'absolute',bottom:0,height:'2px',width:'33.333%',background:C.text,left:`${Math.max(0,Math.min(66.666,((['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333)+(-swipeX/(typeof window!=='undefined'?window.innerWidth:375)*33.333)))}%`,transition:swipeX===0?'left 0.25s cubic-bezier(0.4,0,0.2,1)':'none'}}/>
+            {/* sliding indicator — follows finger exactly */}
+            <div style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${Math.max(0,Math.min(66.666,((['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333)+(-swipeX/(typeof window!=='undefined'?window.innerWidth:375)*100)))}%`,transition:swipeX===0?'left 0.25s cubic-bezier(0.4,0,0.2,1)':'none'}}/>
           </div>
         </div>
         {/* pull-to-refresh indicator */}
@@ -680,7 +707,7 @@ export default function App() {
         </div>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
         {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
@@ -865,22 +892,22 @@ export default function App() {
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
       </>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(4px + env(safe-area-inset-bottom, 0px))`}}>
         {[
-          {id:'feed',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
-          {id:'messages',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
-          {id:'search',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
-          {id:'market',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
-          {id:'profile',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
+          {id:'feed',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
+          {id:'messages',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
+          {id:'search',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
+          {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
+          {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'14px 0 10px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 4px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
@@ -891,14 +918,13 @@ export default function App() {
 
       {/* ─── POST MODAL ─── */}
       {showPost && (<>
-        {/* overlay — shows feed behind */}
-        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:resolved==='light'?'rgba(120,120,120,0.3)':'rgba(0,0,0,0.5)'}}/>
+        {/* overlay — transparent, no separate layer needed since sheet covers full screen */}
         {/* sheet — fixed position, swipe down to dismiss smoothly */}
         <div
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',top:'8vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',overflowY:'hidden'}}
+          style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',paddingTop:'6vh',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',overflow:'hidden',touchAction:'none'}}
           onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
-          onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0){e.preventDefault();setPostDragY(dy)}}}
+          onTouchMove={e=>{e.preventDefault();const dy=e.touches[0].clientY-postDragStart.current; if(dy>0)setPostDragY(dy)}}
           onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
         >
             {/* drag handle */}
