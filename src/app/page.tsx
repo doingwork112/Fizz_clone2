@@ -516,31 +516,34 @@ export default function App() {
           <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{p.text}</div>
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {(p as any).repost_of&&(
-            <div style={{border:`1px solid ${C.border}`,borderRadius:'12px',padding:'10px 12px',marginTop:'10px',background:C.surface}} onClick={()=>openPost((p as any).repost_of)}>
-              <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
-                <div style={{width:'20px',height:'20px',borderRadius:'50%',background:(p as any).repost_of.is_anon?avColor((p as any).repost_of.user_id):((p as any).repost_of.profiles?.avatar_color||'#888'),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.55rem',color:'white',fontWeight:700}}>{(p as any).repost_of.is_anon?anonEmoji((p as any).repost_of.user_id):((p as any).repost_of.profiles?.avatar_initials||'?')}</div>
-                <span style={{fontSize:'0.78rem',fontWeight:600,color:C.muted}}>{(p as any).repost_of.is_anon?'Anonymous':((p as any).repost_of.profiles?.username||'User')}</span>
-                <span style={{fontSize:'0.72rem',color:C.muted}}>{ago((p as any).repost_of.created_at)}</span>
+            <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'14px 14px',marginTop:'10px',background:C.bg,cursor:'pointer'}} onClick={()=>openPost((p as any).repost_of)}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <img src={avImg((p as any).repost_of.user_id)} alt="" style={{width:'24px',height:'24px',borderRadius:'50%',objectFit:'cover'}}/>
+                <span style={{fontSize:'0.85rem',fontWeight:700,color:C.text}}>{(p as any).repost_of.is_anon?'Anonymous':((p as any).repost_of.profiles?.username||'User')}</span>
+                <span style={{fontSize:'0.78rem',color:C.muted}}>{ago((p as any).repost_of.created_at)}</span>
               </div>
-              <div style={{fontSize:'0.88rem',color:C.text,lineHeight:'1.45'}}>{(p as any).repost_of.text}</div>
-              {(p as any).repost_of.images&&(p as any).repost_of.images.length>0&&<img src={(p as any).repost_of.images[0]} alt="" style={{width:'100%',maxHeight:'120px',objectFit:'cover',borderRadius:'8px',marginTop:'6px'}}/>}
+              <div style={{fontSize:'0.92rem',color:C.text,lineHeight:'1.5'}}>{(p as any).repost_of.text}</div>
+              {(p as any).repost_of.images&&(p as any).repost_of.images.length>0&&<img src={(p as any).repost_of.images[0]} alt="" style={{width:'100%',maxHeight:'160px',objectFit:'cover',borderRadius:'10px',marginTop:'8px'}}/>}
             </div>
           )}
-          {/* action row */}
-          <div style={{display:'flex',alignItems:'center',gap:'14px',marginTop:'10px',color:C.muted}}>
-            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-              {p.comments_count}
+          {/* action row — matches Fizz: DM, Comment, Repost, Share, ••• */}
+          <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px',color:C.muted}}>
+            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
-            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-              {(p as any).reposts_count||0}
+            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.88rem',fontWeight:600,padding:0,fontFamily:'inherit'}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+              {p.comments_count||''}
             </button>
-            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.85rem',padding:0}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.88rem',fontWeight:600,padding:0,fontFamily:'inherit'}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+              {(p as any).reposts_count||''}
             </button>
-            <span style={{fontSize:'0.9rem',cursor:'pointer',color:C.muted}}>•••</span>
-            {p.user_id===profile!.id && <button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.82rem',padding:0,marginLeft:'auto'}}>删除</button>}
+            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </button>
+            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0,fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
+            {p.user_id===profile!.id && <button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.82rem',fontWeight:700,padding:0,marginLeft:'auto',fontFamily:'inherit'}}>删除</button>}
           </div>
           {/* comments */}
           {cmtsOpen && (
@@ -653,7 +656,7 @@ export default function App() {
         <div style={{background:C.bg,position:'sticky',top:'53px',zIndex:99,borderBottom:`1px solid ${C.border}`}}>
           <div style={{display:'flex',position:'relative'}}>
             {(['Top',"Fizzin'",'New'] as const).map(t=>(
-              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?700:400,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
+              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?800:600,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
                 {t}
               </div>
             ))}
@@ -869,7 +872,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px 0 18px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 6px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
@@ -878,21 +881,18 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ─── POST MODAL (Fizz-style full-screen sheet, NO black gaps) ─── */}
-      {showPost && (
+      {/* ─── POST MODAL (Fizz-style bottom sheet with visible background) ─── */}
+      {showPost && (<>
+        {/* semi-transparent overlay — shows previous page behind */}
+        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.35)'}}/>
+        {/* sheet — sits on top, swipe down to close, touch locked (no overscroll) */}
         <div
-          style={{position:'fixed',inset:0,zIndex:399,background:C.bg,display:'flex',flexDirection:'column'}}
-          className={postClosing?'fade-out':'fade-in'}
+          className={postClosing?'slide-down':'slide-up'}
+          style={{position:'fixed',top:'10vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)',overflow:'hidden',touchAction:'none'}}
+          onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
+          onTouchMove={e=>{e.preventDefault();const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
+          onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
         >
-          {/* gray top area — tappable to close */}
-          <div onClick={closePost} style={{background:resolved==='light'?'#e5e5e5':'#222',flexShrink:0,minHeight:'10vh',transition:'min-height 0.3s ease'}}/>
-          {/* sheet */}
-          <div
-            style={{flex:1,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)',overflow:'hidden',boxShadow:'0 -4px 30px rgba(0,0,0,0.1)'}}
-            onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
-            onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
-            onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
-          >
             {/* drag handle */}
             <div style={{display:'flex',justifyContent:'center',padding:'10px 0 4px',cursor:'grab',flexShrink:0}}>
               <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
@@ -942,8 +942,7 @@ export default function App() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+      </>)}
 
       {/* ─── LISTING MODAL ─── */}
       {showListing && (
