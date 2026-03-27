@@ -132,14 +132,21 @@ export default function App() {
   const chatDetailRef = useRef<HTMLDivElement>(null)
   const chatTargetRef = useRef<Profile|null>(null)
   const detailBackdropRef = useRef<HTMLDivElement>(null)
+  const listingDetailRef = useRef<HTMLDivElement>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
 
 
   const [showListing, setShowListing] = useState(false)
-  const [lf, setLf] = useState({ title:'', price:'', cat:'clothes', desc:'', condition:'Good' })
+  const [lf, setLf] = useState({ title:'', price:'', cat:'', desc:'', condition:'' })
   const [lFiles, setLFiles] = useState<File[]>([])
+  const [selectedListing, setSelectedListing] = useState<Listing|null>(null)
+  const [mktSearch, setMktSearch] = useState('')
+  const [mktHideSold, setMktHideSold] = useState(false)
+  const [mktCondFilter, setMktCondFilter] = useState('')
+  const [savedListings, setSavedListings] = useState<string[]>([])
+  const [listingView, setListingView] = useState<'cat'|'cond'|null>(null)
   const [lPreviews, setLPreviews] = useState<string[]>([])
   const [lUploading, setLUploading] = useState(false)
 
@@ -295,7 +302,7 @@ export default function App() {
   }
 
   async function loadListings() {
-    const { data } = await sb.from('listings').select('*,profiles(*)').eq('is_sold',false).order('created_at',{ascending:false})
+    const { data } = await sb.from('listings').select('*,profiles(*)').order('created_at',{ascending:false})
     setListings(data||[])
   }
   function pickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -311,8 +318,8 @@ export default function App() {
       const { error } = await sb.storage.from('listing-images').upload(path,file,{upsert:true})
       if (!error) { const { data: u } = sb.storage.from('listing-images').getPublicUrl(path); urls.push(u.publicUrl) }
     }
-    await sb.from('listings').insert({user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,category:lf.cat,description:lf.desc,emoji:'📦',school:profile.school,images:urls})
-    setShowListing(false); setLf({title:'',price:'',cat:'clothes',desc:'',condition:'Good'}); setLFiles([]); setLPreviews([])
+    await sb.from('listings').insert({user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,category:lf.cat,description:lf.desc,condition:lf.condition,emoji:'📦',school:profile.school,images:urls})
+    setShowListing(false); setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null)
     setLUploading(false); loadListings()
   }
 
@@ -882,7 +889,13 @@ export default function App() {
     </div>
   )
 
-  const mktFiltered = mktCat==='all' ? listings : listings.filter(l=>l.category===mktCat)
+  const mktFiltered = listings.filter(l=>{
+    if (mktHideSold && l.is_sold) return false
+    if (mktCat && mktCat!=='all' && l.category!==mktCat) return false
+    if (mktCondFilter && (l as any).condition !== mktCondFilter) return false
+    if (mktSearch && !l.title.toLowerCase().includes(mktSearch.toLowerCase()) && !l.description?.toLowerCase().includes(mktSearch.toLowerCase())) return false
+    return true
+  })
   const topBar = (title: React.ReactNode, right?: React.ReactNode) => (
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
       <div style={{fontWeight:700,fontSize:'1.05rem',display:'flex',alignItems:'center',gap:'8px'}}>{title}</div>
@@ -1028,47 +1041,140 @@ export default function App() {
 
       {/* ─── MARKET ─── */}
       {page==='market' && <>
+        {/* Search bar */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
-          <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'20px',padding:'8px 14px'}}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <span style={{color:C.muted,fontSize:'0.88rem'}}>Search listings…</span>
+          <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'22px',padding:'10px 14px'}}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input value={mktSearch} onChange={e=>setMktSearch(e.target.value)} placeholder="Search Rice Marketplace" style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.9rem',fontFamily:'inherit'}}/>
           </div>
-          <div style={{fontSize:'1.3rem',cursor:'pointer'}}>🔖</div>
-          <div style={{fontSize:'1.3rem',cursor:'pointer'}}>🏷️</div>
+          <button onClick={()=>setSavedListings([])} style={{background:'none',border:'none',cursor:'pointer',padding:'4px'}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2.2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+          </button>
+          <button style={{background:'none',border:'none',cursor:'pointer',padding:'4px'}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2.2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          </button>
         </div>
-        <div style={{display:'flex',gap:'8px',padding:'10px 12px',overflowX:'auto',borderBottom:`1px solid ${C.border}`}}>
-          {[['all','All'],['clothes','Clothes'],['electronics','Electronics'],['books','Books'],['other','Other']].map(([c,l])=>(
-            <div key={c} onClick={()=>setMktCat(c)} style={{flexShrink:0,padding:'6px 14px',borderRadius:'20px',border:`1px solid ${mktCat===c?C.accentBright:C.border}`,background:mktCat===c?(resolved==='dark'?'rgba(37,99,235,.2)':'#eff6ff'):'transparent',color:mktCat===c?C.accentBright:C.muted,fontSize:'0.85rem',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
-              {l}
-            </div>
-          ))}
+        {/* Filter pills */}
+        <div style={{display:'flex',gap:'8px',padding:'10px 12px',overflowX:'auto',borderBottom:`1px solid ${C.border}`,scrollbarWidth:'none'}}>
+          <button onClick={()=>{}} style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+            Sort by <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="7 16 12 21 17 16"/><polyline points="7 8 12 3 17 8"/></svg>
+          </button>
+          <button onClick={()=>setMktHideSold(v=>!v)} style={{flexShrink:0,padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktHideSold?C.accentBright:C.border}`,background:mktHideSold?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktHideSold?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+            Hide Sold
+          </button>
+          <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCat&&mktCat!=='all'?C.accentBright:C.border}`,background:'transparent',color:mktCat&&mktCat!=='all'?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setMktCat(mktCat&&mktCat!=='all'?'all':'')}>
+            Category <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCondFilter?C.accentBright:C.border}`,background:'transparent',color:mktCondFilter?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setMktCondFilter(v=>v?'':'Good')}>
+            Condition <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1px',background:C.border}}>
+        {/* Grid */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',padding:'12px'}}>
           {mktFiltered.map(l=>(
-            <div key={l.id} style={{background:C.bg,cursor:'pointer'}}>
-              <div style={{height:'180px',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative'}}>
+            <div key={l.id} onClick={()=>setSelectedListing(l)} style={{background:C.bg,borderRadius:'16px',overflow:'hidden',cursor:'pointer',border:`1px solid ${C.border}`,boxShadow:resolved==='light'?'0 2px 8px rgba(0,0,0,0.07)':'none'}}>
+              <div style={{aspectRatio:'1',background:C.surface,position:'relative',overflow:'hidden'}}>
                 {l.images&&l.images.length>0
-                  ? <img src={l.images[0]} alt={l.title} style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                  : <span style={{fontSize:'2.5rem'}}>{l.emoji||'📦'}</span>
+                  ? <img src={l.images[0]} alt={l.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5rem'}}>{l.emoji||'📦'}</div>
                 }
-                {l.is_sold&&<div style={{position:'absolute',top:'8px',left:'8px',background:'rgba(0,0,0,0.75)',color:'white',borderRadius:'6px',padding:'3px 8px',fontSize:'0.72rem',fontWeight:700}}>SOLD</div>}
+                {l.is_sold&&<div style={{position:'absolute',top:'8px',left:'8px',background:'rgba(0,0,0,0.82)',color:'white',borderRadius:'8px',padding:'3px 10px',fontSize:'0.75rem',fontWeight:800,letterSpacing:'.5px'}}>SOLD</div>}
               </div>
-              <div style={{padding:'10px 10px 14px'}}>
-                <div style={{fontWeight:700,fontSize:'0.9rem',marginBottom:'3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.title}</div>
+              <div style={{padding:'10px 12px 12px'}}>
+                <div style={{fontWeight:700,fontSize:'0.9rem',marginBottom:'3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:C.text}}>{l.title}</div>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontWeight:700,fontSize:'0.95rem'}}>¥{l.price}</span>
-                  {l.description&&<span style={{fontSize:'0.75rem',color:C.muted}}>{l.description.slice(0,8)}</span>}
+                  <span style={{fontWeight:800,fontSize:'0.97rem',color:C.text}}>${l.price}</span>
+                  <span style={{fontSize:'0.75rem',color:C.muted}}>{(l as any).condition||'Good'}</span>
                 </div>
-                {l.user_id===profile.id&&<button onClick={()=>sb.from('listings').update({is_sold:true}).eq('id',l.id).then(()=>loadListings())} style={{marginTop:'6px',width:'100%',padding:'5px',background:'transparent',border:`1px solid ${C.border}`,borderRadius:'6px',color:C.muted,fontSize:'0.75rem',cursor:'pointer',fontFamily:'inherit'}}>Mark Sold</button>}
               </div>
             </div>
           ))}
         </div>
-        {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>暂无商品</div>}
-        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
-          <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
-          <span style={{maxWidth:fabExpanded?'60px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>List</span>
+        {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px',fontSize:'0.95rem'}}>No listings found</div>}
+        {/* List FAB */}
+        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'105px',right:'16px',background:C.accentBright,color:'white',border:'none',borderRadius:'28px',padding:'14px 20px',fontWeight:800,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',boxShadow:'0 4px 20px rgba(37,99,235,0.4)',zIndex:150}}>
+          <span style={{fontSize:'1.1rem',lineHeight:1}}>＋</span>
+          <span>List</span>
         </button>
+
+        {/* ─── LISTING DETAIL ─── */}
+        {selectedListing&&(
+          <div ref={listingDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+            {/* top bar */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
+              <button onClick={()=>setSelectedListing(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+              <button style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+              </button>
+            </div>
+            {/* main image */}
+            {selectedListing.images&&selectedListing.images.length>0
+              ? <img src={selectedListing.images[0]} alt={selectedListing.title} style={{width:'100%',aspectRatio:'1',objectFit:'cover'}}/>
+              : <div style={{width:'100%',aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
+            }
+            {/* info */}
+            <div style={{padding:'16px 18px 32px'}}>
+              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'4px'}}>
+                <div style={{fontSize:'1.7rem',fontWeight:900,color:C.text}}>${selectedListing.price}</div>
+                <div style={{display:'flex',gap:'12px'}}>
+                  <button style={{background:'none',border:'none',cursor:'pointer',color:C.muted}}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                  </button>
+                  <button style={{background:'none',border:'none',cursor:'pointer',color:C.muted}}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div style={{fontSize:'1.15rem',fontWeight:700,color:C.text,marginBottom:'16px'}}>{selectedListing.title}</div>
+              {/* action buttons */}
+              <div style={{display:'flex',gap:'10px',marginBottom:'22px'}}>
+                <button onClick={()=>setSavedListings(s=>s.includes(selectedListing.id)?s.filter(x=>x!==selectedListing.id):[...s,selectedListing.id])} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:resolved==='light'?'#f0f0f0':C.surface2,color:C.text,fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill={savedListings.includes(selectedListing.id)?C.text:'none'} stroke={C.text} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                  {savedListings.includes(selectedListing.id)?'Saved':'Save for later'}
+                </button>
+                <button onClick={()=>{ if(selectedListing.profiles){setPage('messages'); setTimeout(()=>openChat(selectedListing.profiles as Profile),60)} }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:'#6C2BD9',color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Message Seller
+                </button>
+              </div>
+              {/* description */}
+              {selectedListing.description&&<>
+                <div style={{fontWeight:800,fontSize:'1rem',color:C.text,marginBottom:'6px'}}>Description</div>
+                <div style={{fontSize:'0.95rem',color:resolved==='light'?'#333':C.text,lineHeight:'1.6',marginBottom:'20px'}}>{selectedListing.description}</div>
+              </>}
+              {/* details */}
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'20px'}}>
+                {(selectedListing as any).condition&&<div style={{display:'flex',gap:'16px'}}><span style={{fontWeight:800,color:C.text,minWidth:'90px'}}>Condition</span><span style={{color:resolved==='light'?'#555':C.muted}}>{(selectedListing as any).condition}</span></div>}
+                {selectedListing.category&&<div style={{display:'flex',gap:'16px'}}><span style={{fontWeight:800,color:C.text,minWidth:'90px'}}>Category</span><span style={{color:resolved==='light'?'#555':C.muted,textTransform:'capitalize'}}>{selectedListing.category}</span></div>}
+              </div>
+              <div style={{fontSize:'0.85rem',color:C.muted,marginBottom:'28px'}}>Posted {ago(selectedListing.created_at)}</div>
+              {/* similar items */}
+              {listings.filter(l=>l.id!==selectedListing.id&&l.category===selectedListing.category&&!l.is_sold).length>0&&<>
+                <div style={{fontWeight:800,fontSize:'1.05rem',color:C.text,marginBottom:'14px'}}>Similar Items</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                  {listings.filter(l=>l.id!==selectedListing.id&&l.category===selectedListing.category&&!l.is_sold).slice(0,4).map(l=>(
+                    <div key={l.id} onClick={()=>setSelectedListing(l)} style={{borderRadius:'12px',overflow:'hidden',border:`1px solid ${C.border}`,cursor:'pointer'}}>
+                      {l.images&&l.images.length>0
+                        ? <img src={l.images[0]} alt={l.title} style={{width:'100%',aspectRatio:'1',objectFit:'cover',display:'block'}}/>
+                        : <div style={{aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2rem'}}>{l.emoji||'📦'}</div>
+                      }
+                      <div style={{padding:'8px'}}>
+                        <div style={{fontWeight:700,fontSize:'0.82rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.title}</div>
+                        <div style={{fontWeight:800,fontSize:'0.88rem'}}>${l.price}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>}
+              {/* own listing actions */}
+              {selectedListing.user_id===profile.id&&(
+                <button onClick={()=>sb.from('listings').update({is_sold:true}).eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})} style={{marginTop:'20px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:'14px',color:C.muted,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                  Mark as Sold
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </>}
 
       {/* ─── PROFILE ─── */}
@@ -1234,60 +1340,122 @@ export default function App() {
       </>)}
 
       {/* ─── LISTING MODAL ─── */}
-      {showListing && (
-        <div style={overlay} onClick={e=>e.target===e.currentTarget&&setShowListing(false)}>
-          <div style={sheet}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
-              <button onClick={()=>setShowListing(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontFamily:'inherit'}}>取消</button>
-              <div style={{fontWeight:700}}>发布商品</div>
-              <button onClick={submitListing} disabled={lUploading||!lf.title} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',opacity:(!lf.title||lUploading)?.5:1,fontFamily:'inherit'}}>
-                {lUploading?'上传中…':'发布'}
-              </button>
-            </div>
-            {/* image upload area */}
-            <label>
-              <div style={{border:`2px dashed ${C.border}`,borderRadius:'14px',padding:'16px',marginBottom:'14px',cursor:'pointer',minHeight:'100px',display:'flex',alignItems:'center',justifyContent:'center',flexWrap:'wrap',gap:'8px'}}>
-                {lPreviews.length>0 ? (
-                  <>
-                    {lPreviews.map((p,i)=><img key={i} src={p} alt="" style={{width:'72px',height:'72px',objectFit:'cover',borderRadius:'10px'}}/>)}
-                    <div style={{width:'72px',height:'72px',background:C.surface2,borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.5rem',color:C.muted}}>+</div>
-                  </>
-                ) : (
-                  <div style={{textAlign:'center',color:C.muted}}>
-                    <div style={{fontSize:'2rem',marginBottom:'6px'}}>📸</div>
-                    <div style={{fontSize:'0.88rem',fontWeight:600}}>点击添加照片</div>
-                    <div style={{fontSize:'0.78rem',marginTop:'2px'}}>最多8张，支持多选</div>
-                  </div>
-                )}
+      {showListing&&(
+        <div className="slide-in-right" style={{position:'fixed',inset:0,zIndex:500,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+          {/* header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
+            <button onClick={()=>{setShowListing(false);setLf({title:'',price:'',cat:'',desc:'',condition:''});setLFiles([]);setLPreviews([]);setListingView(null)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontSize:'0.95rem',fontFamily:'inherit'}}>Cancel</button>
+            <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>New Listing</span>
+            <div style={{width:'60px'}}/>
+          </div>
+
+          {/* category picker sub-view */}
+          {listingView==='cat'&&(
+            <div className="slide-in-right" style={{position:'absolute',inset:0,zIndex:10,background:resolved==='light'?'#ffffff':C.bg,overflowY:'auto'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
+                <button onClick={()=>setListingView(null)} style={{width:'32px',height:'32px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+                <span style={{fontWeight:800,fontSize:'1.1rem',color:C.text}}>Select Category</span>
               </div>
-              <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickFiles} />
-            </label>
-            {/* fields */}
-            {[['title','商品名称 *','例：Vintage 连衣裙'],['price','价格（元）','0'],['desc','描述','成色、尺码等…']].map(([k,l,ph])=>(
-              <div key={k} style={{marginBottom:'12px'}}>
-                <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'.5px'}}>{l}</label>
-                <input style={inp} type={k==='price'?'number':'text'} placeholder={ph} value={(lf as any)[k]} onChange={e=>setLf(f=>({...f,[k]:e.target.value}))} />
-              </div>
-            ))}
-            <div style={{marginBottom:'12px'}}>
-              <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'.5px'}}>分类</label>
-              <select style={{...inp,cursor:'pointer'}} value={lf.cat} onChange={e=>setLf(f=>({...f,cat:e.target.value}))}>
-                <option value="clothes">👕 服装</option>
-                <option value="electronics">💻 电子</option>
-                <option value="books">📚 教材</option>
-                <option value="other">🎁 其他</option>
-              </select>
-            </div>
-            <div style={{marginBottom:'8px'}}>
-              <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'.5px'}}>成色</label>
-              <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                {['New','Like New','Good','Fair'].map(c=>(
-                  <div key={c} onClick={()=>setLf(f=>({...f,condition:c}))} style={{padding:'7px 16px',borderRadius:'20px',border:`1px solid ${lf.condition===c?C.accentBright:C.border}`,background:lf.condition===c?(resolved==='dark'?'rgba(37,99,235,.2)':'#eff6ff'):'transparent',color:lf.condition===c?C.accentBright:C.muted,fontSize:'0.85rem',fontWeight:600,cursor:'pointer'}}>
-                    {c}
-                  </div>
+              <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',gap:'8px'}}>
+                {[{emoji:'👕',label:'Clothes'},{emoji:'👠',label:'Shoes'},{emoji:'🧢',label:'Hats'},{emoji:'💍',label:'Jewelry'},{emoji:'🕶️',label:'Accessories'},{emoji:'📚',label:'Books'},{emoji:'🎒',label:'School Gear'},{emoji:'📱',label:'Electronics'},{emoji:'🚲',label:'Bikes'},{emoji:'🏠',label:'Home Goods'},{emoji:'🪑',label:'Furniture'},{emoji:'🎟️',label:'Tickets'},{emoji:'❓',label:'Other'}].map(({emoji,label})=>(
+                  <button key={label} onClick={()=>{setLf(f=>({...f,cat:label}));setListingView(null)}} style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px',borderRadius:'14px',background:resolved==='light'?'#f5f5f7':C.surface,border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left' as const,width:'100%'}}>
+                    <span style={{fontSize:'1.4rem',width:'32px',textAlign:'center'}}>{emoji}</span>
+                    <span style={{fontWeight:700,fontSize:'0.97rem',color:C.text,flex:1}}>{label}</span>
+                    {lf.cat===label&&<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.accentBright} strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
                 ))}
               </div>
             </div>
+          )}
+
+          {/* condition picker sub-view */}
+          {listingView==='cond'&&(
+            <div className="slide-in-right" style={{position:'absolute',inset:0,zIndex:10,background:resolved==='light'?'#ffffff':C.bg,overflowY:'auto'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
+                <button onClick={()=>setListingView(null)} style={{width:'32px',height:'32px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+                <span style={{fontWeight:800,fontSize:'1.1rem',color:C.text}}>Select Condition</span>
+              </div>
+              <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
+                {[{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
+                  <button key={label} onClick={()=>{setLf(f=>({...f,condition:label}));setListingView(null)}} style={{display:'flex',flexDirection:'column' as const,alignItems:'flex-start',gap:'4px',padding:'18px',borderRadius:'14px',background:resolved==='light'?'#f5f5f7':C.surface,border:lf.condition===label?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left' as const,width:'100%'}}>
+                    <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>{label}</span>
+                    <span style={{fontWeight:400,fontSize:'0.87rem',color:C.muted}}>{desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* form body */}
+          <div style={{padding:'20px 20px 40px',display:'flex',flexDirection:'column',gap:'0'}}>
+            {/* PHOTO */}
+            <div style={{marginBottom:'24px'}}>
+              <div style={{fontWeight:800,fontSize:'0.82rem',letterSpacing:'.5px',color:C.text,marginBottom:'12px'}}>PHOTO</div>
+              <input id="limg" type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickFiles}/>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gridTemplateRows:'auto auto',gap:'8px',height:'220px'}}>
+                {/* main large slot */}
+                <label htmlFor="limg" style={{gridRow:'1/3',borderRadius:'14px',border:`2px dashed ${C.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',background:lPreviews[0]?'transparent':C.surface,overflow:'hidden',position:'relative' as const}}>
+                  {lPreviews[0]?<img src={lPreviews[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<>
+                    <div style={{position:'relative',marginBottom:'8px'}}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <div style={{position:'absolute',top:'-4px',right:'-4px',width:'16px',height:'16px',borderRadius:'50%',background:'#ef4444',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',fontWeight:700}}>+</div>
+                    </div>
+                    <span style={{fontSize:'0.78rem',color:C.muted}}>Add up to 5 photos</span>
+                  </>}
+                </label>
+                {/* 4 small slots */}
+                {[1,2,3,4].map(i=>(
+                  <label key={i} htmlFor="limg" style={{borderRadius:'12px',border:`2px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:lPreviews[i]?'transparent':C.surface,overflow:'hidden',position:'relative' as const}}>
+                    {lPreviews[i]?<img src={lPreviews[i]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{position:'relative'}}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <div style={{position:'absolute',top:'-4px',right:'-4px',width:'13px',height:'13px',borderRadius:'50%',background:'#ef4444',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:700}}>+</div>
+                    </div>}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* TITLE */}
+            <div style={{borderTop:`1px solid ${C.border}`,paddingTop:'20px',marginBottom:'0'}}>
+              <div style={{fontWeight:800,fontSize:'0.82rem',letterSpacing:'.5px',color:C.text,marginBottom:'12px'}}>TITLE</div>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',borderBottom:`1px solid ${C.border}`,paddingBottom:'12px'}}>
+                <input value={lf.title} onChange={e=>setLf(f=>({...f,title:e.target.value.slice(0,50)}))} placeholder="What are you selling?" style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'1rem',fontFamily:'inherit'}}/>
+                <span style={{fontSize:'0.8rem',color:C.muted,flexShrink:0}}>{50-lf.title.length}</span>
+              </div>
+            </div>
+
+            {/* PRICE */}
+            <div style={{paddingTop:'16px',borderBottom:`1px solid ${C.border}`,paddingBottom:'16px',display:'flex',alignItems:'center',gap:'8px'}}>
+              <span style={{fontWeight:800,color:C.text,fontSize:'1rem'}}>$</span>
+              <input value={lf.price} onChange={e=>setLf(f=>({...f,price:e.target.value}))} placeholder="0.00" type="number" style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'1rem',fontFamily:'inherit'}}/>
+            </div>
+
+            {/* DESCRIPTION */}
+            <div style={{paddingTop:'20px',marginBottom:'0'}}>
+              <div style={{fontWeight:800,fontSize:'0.82rem',letterSpacing:'.5px',color:C.text,marginBottom:'12px'}}>Description</div>
+              <div style={{borderBottom:`1px solid ${C.border}`,paddingBottom:'12px'}}>
+                <textarea value={lf.desc} onChange={e=>setLf(f=>({...f,desc:e.target.value.slice(0,500)}))} placeholder="Describe your item" rows={5} style={{width:'100%',background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.97rem',fontFamily:'inherit',resize:'none' as const,lineHeight:'1.5'}}/>
+                <div style={{textAlign:'right',fontSize:'0.78rem',color:C.muted}}>{500-lf.desc.length}</div>
+              </div>
+            </div>
+
+            {/* DETAILS */}
+            <div style={{paddingTop:'20px',marginBottom:'0'}}>
+              <div style={{fontWeight:800,fontSize:'0.82rem',letterSpacing:'.5px',color:C.text,marginBottom:'12px'}}>DETAILS</div>
+              <button onClick={()=>setListingView('cat')} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0',borderBottom:`1px solid ${C.border}`,background:'none',border:'none',borderBottom:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit'}}>
+                <span style={{color:lf.cat?C.text:C.muted,fontSize:'0.97rem',fontWeight:lf.cat?700:400}}>{lf.cat||'Select Category'}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+              <button onClick={()=>setListingView('cond')} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0',background:'none',border:'none',borderBottom:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit'}}>
+                <span style={{color:lf.condition?C.text:C.muted,fontSize:'0.97rem',fontWeight:lf.condition?700:400}}>{lf.condition||'Select Condition'}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+
+            {/* LIST BUTTON */}
+            <button onClick={submitListing} disabled={!lf.title||lUploading} style={{marginTop:'32px',width:'100%',padding:'16px',borderRadius:'14px',background:lf.title&&!lUploading?C.accentBright:'#888',color:'white',border:'none',fontWeight:800,fontSize:'1rem',cursor:lf.title&&!lUploading?'pointer':'not-allowed',fontFamily:'inherit'}}>
+              {lUploading?'Listing…':'List item'}
+            </button>
           </div>
         </div>
       )}
