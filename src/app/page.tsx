@@ -112,6 +112,8 @@ export default function App() {
   const lastScrollY = useRef(0)
   const [refreshing, setRefreshing] = useState(false)
   const [pullY, setPullY] = useState(0)
+  const [mktRefreshing, setMktRefreshing] = useState(false)
+  const [mktPullY, setMktPullY] = useState(0)
   const touchStartY = useRef(0)
   const touchStartX = useRef(0)
   const [postDragY, setPostDragY] = useState(0)
@@ -133,12 +135,14 @@ export default function App() {
   const chatTargetRef = useRef<Profile|null>(null)
   const detailBackdropRef = useRef<HTMLDivElement>(null)
   const listingDetailRef = useRef<HTMLDivElement>(null)
+  const selectedListingRef = useRef<Listing|null>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
 
 
   const [showListing, setShowListing] = useState(false)
+  const [listingClosing, setListingClosing] = useState(false)
   const [lf, setLf] = useState({ title:'', price:'', cat:'', desc:'', condition:'' })
   const [lFiles, setLFiles] = useState<File[]>([])
   const [selectedListing, setSelectedListing] = useState<Listing|null>(null)
@@ -534,6 +538,10 @@ export default function App() {
     }
     setTimeout(() => setSelectedPost(null), 290)
   }
+  function closeListing() {
+    setListingClosing(true)
+    setTimeout(()=>{ setShowListing(false); setListingClosing(false); setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null) }, 340)
+  }
   function closeChat() {
     if (chatDetailRef.current) {
       chatDetailRef.current.style.transition = 'transform 0.28s ease'
@@ -576,15 +584,20 @@ export default function App() {
   const feedTabRef = useRef(feedTab)
   const pageRef = useRef(page)
   const pullYRef = useRef(pullY)
+  const mktPullYRef = useRef(mktPullY)
   const swipeXRef = useRef(0)
   const indicatorRef = useRef<HTMLDivElement>(null)
+  const feedBodyRef = useRef<HTMLDivElement>(null)
+  const feedSwipeDir = useRef(0)
   feedTabRef.current = feedTab
   pageRef.current = page
   pullYRef.current = pullY
+  mktPullYRef.current = mktPullY
   selectedPostRef.current = selectedPost
   showPostRef.current = showPost
   showRepostRef.current = showRepost
   chatTargetRef.current = chatTarget
+  selectedListingRef.current = selectedListing
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -632,21 +645,46 @@ export default function App() {
         }
         return
       }
-      if (pageRef.current !== 'feed') return
+      // Listing detail open: swipe-back (right)
+      if (selectedListingRef.current) {
+        if (dx > 8) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0) {
+          if (e.cancelable) e.preventDefault()
+          swipeXRef.current = dx
+          if (listingDetailRef.current) {
+            listingDetailRef.current.style.animation = 'none'
+            listingDetailRef.current.style.transition = 'none'
+            listingDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          }
+        }
+        return
+      }
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market') return
+      if (pageRef.current !== 'feed') {
+        // market page: only vertical pull handled above, no horizontal swipe
+        return
+      }
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
         swipeXRef.current = dx
-        // Directly move indicator via DOM — no re-render, no avatar flash
+        feedSwipeDir.current = dx > 0 ? 1 : -1
+        // Move indicator
         if (indicatorRef.current) {
           const tabIdx = ['Top',"Fizzin'",'New'].indexOf(feedTabRef.current)
           const pct = Math.max(0, Math.min(66.666, tabIdx * 33.333 + (-dx / window.innerWidth * 100)))
           indicatorRef.current.style.left = pct + '%'
           indicatorRef.current.style.transition = 'none'
         }
+        // Move feed content with finger
+        if (feedBodyRef.current) {
+          feedBodyRef.current.style.transition = 'none'
+          feedBodyRef.current.style.transform = `translateX(${dx}px)`
+        }
       }
       if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
         if (e.cancelable) e.preventDefault()
-        setPullY(Math.min(dy * 0.45, 72))
+        if (pageRef.current === 'market') setMktPullY(Math.min(dy * 0.45, 72))
+        else setPullY(Math.min(dy * 0.45, 72))
       }
     }
     async function onTE() {
@@ -694,23 +732,88 @@ export default function App() {
         swipeXRef.current = 0
         return
       }
+      // Listing detail: complete swipe-back or snap back
+      if (selectedListingRef.current) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          if (listingDetailRef.current) {
+            listingDetailRef.current.style.animation = 'none'
+            listingDetailRef.current.style.transition = 'transform 0.28s ease'
+            listingDetailRef.current.style.transform = 'translateX(100%)'
+          }
+          setTimeout(() => setSelectedListing(null), 290)
+        } else if (listingDetailRef.current) {
+          listingDetailRef.current.style.animation = 'none'
+          listingDetailRef.current.style.transition = 'transform 0.25s ease'
+          listingDetailRef.current.style.transform = 'translateX(0)'
+          setTimeout(() => { if (listingDetailRef.current) listingDetailRef.current.style.transition = '' }, 260)
+        }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
       if (pageRef.current !== 'feed') return
       // Reset indicator transition
       if (indicatorRef.current) indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
-      if (pullYRef.current > 52) {
-        setRefreshing(true); setPullY(0)
-        await loadPosts()
-        setRefreshing(false)
-      } else { setPullY(0) }
+      if (pageRef.current === 'market') {
+        if (mktPullYRef.current > 52) {
+          setMktRefreshing(true); setMktPullY(0)
+          await loadListings()
+          setMktRefreshing(false)
+        } else { setMktPullY(0) }
+      } else {
+        if (pullYRef.current > 52) {
+          setRefreshing(true); setPullY(0)
+          await loadPosts()
+          setRefreshing(false)
+        } else { setPullY(0) }
+      }
+      const tabs = ['Top',"Fizzin'",'New'] as const
+      const idx = tabs.indexOf(feedTabRef.current as any)
+      let newTab: typeof tabs[number] | null = null
       if (swipeLocked.current === 'h' && Math.abs(swipeXRef.current) > 40) {
-        const tabs = ['Top',"Fizzin'",'New'] as const
-        const idx = tabs.indexOf(feedTabRef.current as any)
-        if (swipeXRef.current < 0 && idx < tabs.length - 1) setFeedTab(tabs[idx + 1])
-        if (swipeXRef.current > 0 && idx > 0) setFeedTab(tabs[idx - 1])
-      } else if (indicatorRef.current) {
-        // Snap back
-        const tabIdx = ['Top',"Fizzin'",'New'].indexOf(feedTabRef.current)
-        indicatorRef.current.style.left = (tabIdx * 33.333) + '%'
+        if (swipeXRef.current < 0 && idx < tabs.length - 1) newTab = tabs[idx + 1]
+        if (swipeXRef.current > 0 && idx > 0) newTab = tabs[idx - 1]
+      }
+      if (newTab) {
+        const dir = feedSwipeDir.current // 1 = swiped right (going prev), -1 = swiped left (going next)
+        // Slide current content out
+        if (feedBodyRef.current) {
+          feedBodyRef.current.style.transition = 'transform 0.18s ease'
+          feedBodyRef.current.style.transform = `translateX(${dir * window.innerWidth}px)`
+        }
+        // Animate indicator to new tab
+        const newIdx = tabs.indexOf(newTab)
+        if (indicatorRef.current) {
+          indicatorRef.current.style.transition = 'left 0.22s cubic-bezier(0.4,0,0.2,1)'
+          indicatorRef.current.style.left = `${newIdx * 33.333}%`
+        }
+        setTimeout(() => {
+          setFeedTab(newTab!)
+          window.scrollTo(0, 0)
+          // Position new content from opposite side, then slide in
+          if (feedBodyRef.current) {
+            feedBodyRef.current.style.transition = 'none'
+            feedBodyRef.current.style.transform = `translateX(${-dir * window.innerWidth}px)`
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                if (feedBodyRef.current) {
+                  feedBodyRef.current.style.transition = 'transform 0.22s ease'
+                  feedBodyRef.current.style.transform = 'translateX(0)'
+                  setTimeout(() => { if (feedBodyRef.current) feedBodyRef.current.style.transition = '' }, 230)
+                }
+              })
+            })
+          }
+        }, 190)
+      } else {
+        // Snap back — no tab change
+        if (feedBodyRef.current) {
+          feedBodyRef.current.style.transition = 'transform 0.25s ease'
+          feedBodyRef.current.style.transform = 'translateX(0)'
+          setTimeout(() => { if (feedBodyRef.current) feedBodyRef.current.style.transition = '' }, 260)
+        }
+        if (indicatorRef.current) {
+          indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
+          indicatorRef.current.style.left = `${idx * 33.333}%`
+        }
       }
       swipeLocked.current = null
       swipeXRef.current = 0
@@ -935,8 +1038,10 @@ export default function App() {
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
           <div className={refreshing ? 'spin' : ''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform: refreshing ? undefined : `rotate(${pullY*4}deg)`,transition: refreshing ? 'none' : 'transform 0.1s'}}/>
         </div>
-        {sorted().map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
-        {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
+        <div ref={feedBodyRef} style={{willChange:'transform'}}>
+          {sorted().map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
+          {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
+        </div>
         <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
@@ -1041,6 +1146,10 @@ export default function App() {
 
       {/* ─── MARKET ─── */}
       {page==='market' && <>
+        {/* Market pull-to-refresh indicator */}
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:mktRefreshing?'52px':`${mktPullY}px`,transition:mktPullY===0?'height 0.25s ease':'none'}}>
+          <div className={mktRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:mktRefreshing?undefined:`rotate(${mktPullY*4}deg)`,transition:mktRefreshing?'none':'transform 0.1s'}}/>
+        </div>
         {/* Search bar */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'22px',padding:'10px 14px'}}>
@@ -1341,10 +1450,10 @@ export default function App() {
 
       {/* ─── LISTING MODAL ─── */}
       {showListing&&(
-        <div className="slide-in-right" style={{position:'fixed',inset:0,zIndex:500,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+        <div className={listingClosing?'slide-down':'slide-in-right'} style={{position:'fixed',inset:0,zIndex:500,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
           {/* header */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
-            <button onClick={()=>{setShowListing(false);setLf({title:'',price:'',cat:'',desc:'',condition:''});setLFiles([]);setLPreviews([]);setListingView(null)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontSize:'0.95rem',fontFamily:'inherit'}}>Cancel</button>
+            <button onClick={closeListing} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontSize:'0.95rem',fontFamily:'inherit'}}>Cancel</button>
             <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>New Listing</span>
             <div style={{width:'60px'}}/>
           </div>

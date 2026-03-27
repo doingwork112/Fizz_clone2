@@ -80,7 +80,7 @@ body.modal-open {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
-.slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+.slide-in-right { animation: slideInRight 0.38s cubic-bezier(0.32,0.72,0,1) both; }
 
 @keyframes slideOutRight {
   from { transform: translateX(0); }
