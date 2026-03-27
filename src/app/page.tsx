@@ -463,75 +463,53 @@ export default function App() {
   }
 
   function openPostModal() {
-    lockBody()
     setShowPost(true)
   }
   function closePost() {
     setPostClosing(true)
     setPostDragY(0)
-    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]); unlockBody() }, 350)
+    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]) }, 350)
   }
 
   const FEED_TABS = ['Top',"Fizzin'",'New'] as const
 
-  // Use document-level touch listeners so swipe works EVERYWHERE (on posts, buttons, etc.)
-  const swipeDx = useRef(0)
-  const swipeDy = useRef(0)
+  // Swipe handlers — called directly via React onTouchStart/Move/End on feed wrapper
   const swipeLocked = useRef<'h'|'v'|null>(null)
-  const scrollYBefore = useRef(0)
-  useEffect(() => {
-    function onTS(e: TouchEvent) {
-      touchStartY.current = e.touches[0].clientY
-      touchStartX.current = e.touches[0].clientX
-      swipeDx.current = 0
-      swipeDy.current = 0
-      swipeLocked.current = null
-      scrollYBefore.current = window.scrollY
+  const feedRef = useRef<HTMLDivElement>(null)
+  function onFeedTS(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY
+    touchStartX.current = e.touches[0].clientX
+    swipeLocked.current = null
+  }
+  function onFeedTM(e: React.TouchEvent) {
+    const dy = e.touches[0].clientY - touchStartY.current
+    const dx = e.touches[0].clientX - touchStartX.current
+    // Lock direction after 10px
+    if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
     }
-    function onTM(e: TouchEvent) {
-      if (page !== 'feed') return
-      const dy = e.touches[0].clientY - touchStartY.current
-      const dx = e.touches[0].clientX - touchStartX.current
-      swipeDx.current = dx
-      swipeDy.current = dy
-      // Lock direction after 8px movement
-      if (!swipeLocked.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-        swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
-      }
-      if (swipeLocked.current === 'h') {
-        e.preventDefault() // prevent vertical scroll during horizontal swipe
-        setSwipeX(dx)
-      }
-      if (swipeLocked.current === 'v' && scrollYBefore.current === 0 && dy > 0) {
-        setPullY(Math.min(dy * 0.45, 72))
-      }
+    if (swipeLocked.current === 'h') {
+      setSwipeX(dx)
     }
-    async function onTE() {
-      const dx = swipeDx.current
-      const dy = swipeDy.current
-      const locked = swipeLocked.current
-      setSwipeX(0)
-      if (page === 'feed' && pullY > 52) {
-        setRefreshing(true); setPullY(0)
-        await loadPosts()
-        setRefreshing(false)
-      } else { setPullY(0) }
-      if (page === 'feed' && locked === 'h' && Math.abs(dx) > 40) {
-        const idx = FEED_TABS.indexOf(feedTab as any)
-        if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
-        if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
-      }
-      swipeLocked.current = null
+    if (swipeLocked.current === 'v' && window.scrollY === 0 && dy > 0) {
+      setPullY(Math.min(dy * 0.45, 72))
     }
-    document.addEventListener('touchstart', onTS, { passive: true })
-    document.addEventListener('touchmove', onTM, { passive: false }) // non-passive so we can preventDefault for horizontal swipe
-    document.addEventListener('touchend', onTE, { passive: true })
-    return () => {
-      document.removeEventListener('touchstart', onTS)
-      document.removeEventListener('touchmove', onTM)
-      document.removeEventListener('touchend', onTE)
+  }
+  async function onFeedTE() {
+    const dx = swipeX
+    setSwipeX(0)
+    if (pullY > 52) {
+      setRefreshing(true); setPullY(0)
+      await loadPosts()
+      setRefreshing(false)
+    } else { setPullY(0) }
+    if (swipeLocked.current === 'h' && Math.abs(dx) > 40) {
+      const idx = FEED_TABS.indexOf(feedTab as any)
+      if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
+      if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
     }
-  }, [page, feedTab, pullY])
+    swipeLocked.current = null
+  }
 
   // ── Post Card ──
   function PostCard({ p }: { p: Post }) {
@@ -676,11 +654,11 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
     >
 
       {/* ─── FEED ─── */}
-      {page==='feed' && <div style={{touchAction:'pan-y pinch-zoom'}}>
+      {page==='feed' && <div ref={feedRef} onTouchStart={onFeedTS} onTouchMove={onFeedTM} onTouchEnd={onFeedTE} style={{touchAction:'pan-y'}}>
         {topBar(
           <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>{profile.school}</span></>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -708,7 +686,7 @@ export default function App() {
         </div>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
         {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
-        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
@@ -849,7 +827,7 @@ export default function App() {
           ))}
         </div>
         {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>暂无商品</div>}
-        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'60px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>List</span>
         </button>
@@ -893,14 +871,14 @@ export default function App() {
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
-        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
       </>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(18px + env(safe-area-inset-bottom, 0px))`}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(34px + env(safe-area-inset-bottom, 0px))`}}>
         {[
           {id:'feed',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
           {id:'messages',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
@@ -917,62 +895,60 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ─── POST MODAL ─── */}
+      {/* ─── POST MODAL — bottom sheet, keyboard pushes it up ─── */}
       {showPost && (<>
-        {/* overlay — transparent, no separate layer needed since sheet covers full screen */}
-        {/* sheet — fixed position, swipe down to dismiss smoothly */}
+        {/* semi-transparent overlay — shows feed behind */}
+        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.3)'}}/>
+        {/* bottom sheet — sits above keyboard */}
         <div
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',paddingTop:'6vh',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',overflow:'hidden',touchAction:'none'}}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:'55vh',display:'flex',flexDirection:'column',boxShadow:'0 -4px 30px rgba(0,0,0,0.15)'}}
           onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
-          onTouchMove={e=>{e.preventDefault();const dy=e.touches[0].clientY-postDragStart.current; if(dy>0)setPostDragY(dy)}}
+          onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0)setPostDragY(dy)}}
           onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
         >
             {/* drag handle */}
-            <div style={{display:'flex',justifyContent:'center',padding:'10px 0 4px',cursor:'grab',flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}>
               <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
             </div>
-            {/* close button */}
-            <div style={{padding:'4px 16px 8px',flexShrink:0}}>
-              <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'4px'}}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            {/* close + author row */}
+            <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px 8px',flexShrink:0}}>
+              <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'2px',display:'flex'}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
-            </div>
-            {/* author row */}
-            <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'0 16px 14px',flexShrink:0}}>
-              <img src={avImg(profile.id)} alt="" style={{width:'42px',height:'42px',borderRadius:'50%',objectFit:'cover'}}/>
-              <button onClick={()=>setPostAnon(a=>!a)} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',fontWeight:700,fontSize:'0.95rem',color:C.text,fontFamily:'inherit',padding:0}}>
+              <img src={avImg(profile.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover'}}/>
+              <button onClick={()=>setPostAnon(a=>!a)} style={{display:'flex',alignItems:'center',gap:'4px',background:'none',border:'none',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',color:C.text,fontFamily:'inherit',padding:0}}>
                 {postAnon ? 'Anonymous' : profile.username}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
             </div>
-            {/* text area */}
-            <div style={{flex:1,padding:'0 16px 12px',overflowY:'auto'}}>
+            {/* text area — this part scrolls */}
+            <div style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px'}}>
               <textarea
-                style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1.05rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'120px'}}
+                style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'80px'}}
                 placeholder="Share what's really on your mind..."
                 value={postText}
                 onChange={e=>setPostText(e.target.value)}
                 autoFocus
               />
-              {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'130px',objectFit:'cover'}}/>)}</div>}
+              {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden',marginBottom:'8px'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'100px',objectFit:'cover'}}/>)}</div>}
             </div>
-            {/* bottom toolbar — Tag, Photo, MEME, GIF, Poll, Mic, Post */}
-            <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'10px 16px',borderTop:`1px solid ${C.border}`,paddingBottom:`calc(10px + env(safe-area-inset-bottom))`,flexShrink:0,background:C.bg}}>
-              <button style={{display:'flex',alignItems:'center',gap:'4px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'20px',padding:'6px 12px',fontSize:'0.82rem',fontWeight:700,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>+ Tag</button>
-              <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',padding:'6px'}}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+            {/* toolbar — fixed at bottom of sheet, above keyboard */}
+            <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0,background:C.bg}}>
+              <button style={{display:'flex',alignItems:'center',gap:'4px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'20px',padding:'5px 10px',fontSize:'0.8rem',fontWeight:700,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>+ Tag</button>
+              <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',padding:'5px'}}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
                 <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
               </label>
-              <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',fontWeight:800,fontSize:'0.8rem',color:C.muted,fontFamily:'inherit',letterSpacing:'-0.5px'}}>MEME</button>
-              <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',fontWeight:800,fontSize:'0.8rem',color:C.muted,fontFamily:'inherit',letterSpacing:'-0.5px',border:`1px solid ${C.border}`,borderRadius:'6px'}}>GIF</button>
-              <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',color:C.muted}}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+              <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',fontWeight:800,fontSize:'0.78rem',color:C.muted,fontFamily:'inherit'}}>MEME</button>
+              <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',fontWeight:800,fontSize:'0.78rem',color:C.muted,fontFamily:'inherit',border:`1px solid ${C.border}`,borderRadius:'5px'}}>GIF</button>
+              <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',color:C.muted}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
               </button>
-              <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',color:C.muted}}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+              <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',color:C.muted}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
               </button>
-              <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0)} style={{marginLeft:'auto',background:'#a78bfa',color:'white',border:'none',borderRadius:'20px',padding:'8px 20px',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0)||posting?.5:1,fontFamily:'inherit',transition:'background 0.2s'}}>
+              <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0)} style={{marginLeft:'auto',background:'#a78bfa',color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,fontSize:'0.88rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0)||posting?.5:1,fontFamily:'inherit'}}>
                 {posting?'…':'Post'}
               </button>
             </div>
