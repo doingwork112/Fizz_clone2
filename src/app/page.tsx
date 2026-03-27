@@ -107,7 +107,116 @@ export default function App() {
   const [lUploading, setLUploading] = useState(false)
 
   const [showSettings, setShowSettings] = useState(false)
+  const [pullY, setPullY] = useState(0)
   const chatRef = useRef<HTMLDivElement>(null)
+  const feedRef = useRef<HTMLDivElement>(null)
+  const indicatorRef = useRef<HTMLDivElement>(null)
+  const swipeLocked = useRef<'h'|'v'|null>(null)
+  const swipeXRef = useRef(0)
+  const feedTabRef = useRef(feedTab)
+  const pageRef = useRef(page)
+  const pullYRef = useRef(0)
+
+  // Keep refs in sync with state
+  useEffect(() => { feedTabRef.current = feedTab }, [feedTab])
+  useEffect(() => { pageRef.current = page }, [page])
+
+  // Sync body/html background with theme (fixes dark area behind keyboard in light mode)
+  useEffect(() => {
+    const bg = resolved === 'light' ? '#ffffff' : '#0f0f13'
+    document.documentElement.style.background = bg
+    document.body.style.background = bg
+  }, [resolved])
+
+  // ── Swipe & pull-to-refresh: capture-phase listeners on feed wrapper ──
+  useEffect(() => {
+    const el = feedRef.current
+    if (!el) return
+    let sx = 0, sy = 0, refreshing = false
+
+    function onTS(e: TouchEvent) {
+      sx = e.touches[0].clientX
+      sy = e.touches[0].clientY
+      swipeLocked.current = null
+      swipeXRef.current = 0
+      pullYRef.current = 0
+    }
+
+    function onTM(e: TouchEvent) {
+      if (pageRef.current !== 'feed') return
+      const dx = e.touches[0].clientX - sx
+      const dy = e.touches[0].clientY - sy
+
+      // Lock direction after 8px of movement
+      if (!swipeLocked.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+      }
+
+      if (swipeLocked.current === 'h') {
+        // Horizontal swipe — prevent scroll, move tab indicator
+        if (e.cancelable) e.preventDefault()
+        swipeXRef.current = dx
+        if (indicatorRef.current) {
+          const tabs = ['Top', "Fizzin'", 'New']
+          const tabIdx = tabs.indexOf(feedTabRef.current)
+          const pct = Math.max(0, Math.min(66.666, tabIdx * 33.333 + (-dx / window.innerWidth * 100)))
+          indicatorRef.current.style.left = pct + '%'
+          indicatorRef.current.style.transition = 'none'
+        }
+      }
+
+      if (swipeLocked.current === 'v' && window.scrollY === 0 && dy > 0 && !refreshing) {
+        // Pull-to-refresh
+        const py = Math.min(dy * 0.4, 80)
+        pullYRef.current = py
+        setPullY(py)
+      }
+    }
+
+    function onTE() {
+      const dx = swipeXRef.current
+      const tabs = ['Top', "Fizzin'", 'New'] as const
+      const tabIdx = tabs.indexOf(feedTabRef.current)
+
+      if (swipeLocked.current === 'h' && Math.abs(dx) > 50) {
+        // Swipe threshold met — switch tab
+        if (dx < 0 && tabIdx < 2) {
+          setFeedTab(tabs[tabIdx + 1])
+        } else if (dx > 0 && tabIdx > 0) {
+          setFeedTab(tabs[tabIdx - 1])
+        }
+      }
+
+      // Reset indicator position
+      if (indicatorRef.current) {
+        indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
+        // Will be updated by React re-render if tab changed
+      }
+
+      // Pull-to-refresh
+      if (swipeLocked.current === 'v' && pullYRef.current > 50 && !refreshing) {
+        refreshing = true
+        setPullY(40)
+        loadPosts().finally(() => { refreshing = false; setPullY(0) })
+      } else {
+        setPullY(0)
+      }
+
+      swipeLocked.current = null
+      swipeXRef.current = 0
+      pullYRef.current = 0
+    }
+
+    // Capture phase + passive:false = fires before children, can preventDefault
+    el.addEventListener('touchstart', onTS, { capture: true, passive: true })
+    el.addEventListener('touchmove', onTM, { capture: true, passive: false })
+    el.addEventListener('touchend', onTE, { capture: true, passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTS, { capture: true })
+      el.removeEventListener('touchmove', onTM, { capture: true })
+      el.removeEventListener('touchend', onTE, { capture: true })
+    }
+  }, [])
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -573,7 +682,7 @@ export default function App() {
     <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'64px'}}>
 
       {/* ─── FEED ─── */}
-      {page==='feed' && <>
+      {page==='feed' && <div ref={feedRef} style={{touchAction:'pan-y'}}>
         {topBar(
           <><div style={{width:'32px',height:'32px',borderRadius:'50%',background:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem'}}>🎓</div>{profile.school}</>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -584,19 +693,26 @@ export default function App() {
             <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',padding:0}}>⚙️</button>
           </div>
         )}
-        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'sticky',top:'53px',zIndex:99}}>
+        {/* Pull-to-refresh indicator */}
+        {pullY > 0 && (
+          <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:pullY+'px',overflow:'hidden',transition:pullY<5?'height 0.3s':'none'}}>
+            <div style={{fontSize:'1.2rem',transform:`rotate(${pullY*4}deg)`,opacity:Math.min(1,pullY/50)}}>↻</div>
+          </div>
+        )}
+        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'relative',zIndex:99}}>
           {(['Top',"Fizzin'",'New'] as const).map(t=>(
-            <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?700:400,color:feedTab===t?C.text:C.muted,borderBottom:feedTab===t?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer',transition:'all .15s'}}>
+            <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:700,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .15s'}}>
               {t}
             </div>
           ))}
+          <div ref={indicatorRef} style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
         </div>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
         {posts.length===0&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
         <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'72px',right:'50%',transform:'translateX(calc(50% - 16px + 215px - 16px)',background:C.accent,color:'white',border:'none',borderRadius:'24px',padding:'12px 22px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:`0 4px 16px ${C.shadow}`,zIndex:150}}>
           + Post
         </button>
-      </>}
+      </div>}
 
       {/* ─── MESSAGES ─── */}
       {page==='messages' && <>
@@ -782,7 +898,7 @@ export default function App() {
       </>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'env(safe-area-inset-bottom)'}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(34px + env(safe-area-inset-bottom, 0px))`}}>
         {[
           {id:'feed',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
           {id:'messages',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
@@ -790,7 +906,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'10px 0 8px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 8px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
