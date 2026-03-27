@@ -101,6 +101,10 @@ export default function App() {
   const [posting, setPosting] = useState(false)
   const [fabExpanded, setFabExpanded] = useState(true)
   const lastScrollY = useRef(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const [pullY, setPullY] = useState(0)
+  const touchStartY = useRef(0)
+  const touchStartX = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
 
@@ -441,6 +445,40 @@ export default function App() {
   const overlay: React.CSSProperties = { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300, display:'flex', flexDirection:'column', justifyContent:'flex-end' }
   const sheet: React.CSSProperties = { background:C.bg, borderRadius:'20px 20px 0 0', padding:'20px 16px', maxHeight:'92vh', overflowY:'auto' }
 
+  const FEED_TABS = ['Top',"Fizzin'",'New'] as const
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartY.current = e.touches[0].clientY
+    touchStartX.current = e.touches[0].clientX
+  }
+  function handleTouchMove(e: React.TouchEvent) {
+    if (page !== 'feed') return
+    const dy = e.touches[0].clientY - touchStartY.current
+    const dx = e.touches[0].clientX - touchStartX.current
+    // pull-to-refresh: only when at top and pulling down more than sideways
+    if (window.scrollY === 0 && dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+      setPullY(Math.min(dy * 0.45, 72))
+    }
+  }
+  async function handleTouchEnd(e: React.TouchEvent) {
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    // pull-to-refresh
+    if (page === 'feed' && pullY > 52) {
+      setRefreshing(true); setPullY(0)
+      await loadPosts()
+      setRefreshing(false)
+    } else {
+      setPullY(0)
+    }
+    // swipe between tabs (horizontal, more horizontal than vertical)
+    if (page === 'feed' && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      const idx = FEED_TABS.indexOf(feedTab as any)
+      if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
+      if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
+    }
+  }
+
   // ── Post Card ──
   function PostCard({ p }: { p: Post }) {
     const isAnon = p.is_anon
@@ -578,7 +616,12 @@ export default function App() {
   )
 
   return (
-    <div style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'72px'}}>
+    <div
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px'}}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
 
       {/* ─── FEED ─── */}
       {page==='feed' && <>
@@ -599,9 +642,13 @@ export default function App() {
             </div>
           ))}
         </div>
+        {/* pull-to-refresh indicator */}
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
+          <div className={refreshing ? 'spin' : ''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform: refreshing ? undefined : `rotate(${pullY*4}deg)`,transition: refreshing ? 'none' : 'transform 0.1s'}}/>
+        </div>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
-        {posts.length===0&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'80px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
+        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
@@ -742,7 +789,7 @@ export default function App() {
           ))}
         </div>
         {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>暂无商品</div>}
-        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'80px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'60px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>List</span>
         </button>
@@ -786,7 +833,7 @@ export default function App() {
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'80px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
@@ -801,7 +848,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'10px 0 8px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0 14px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}

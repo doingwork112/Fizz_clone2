@@ -22,12 +22,23 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  overscroll-behavior-y: none;
+  background: var(--bg);
+}
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
+  overscroll-behavior-y: none;
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin { animation: spin 0.7s linear infinite; }
 
 .font-fizz { font-family: 'Nunito', sans-serif; }
 
