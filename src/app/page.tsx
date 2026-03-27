@@ -163,6 +163,9 @@ export default function App() {
   const [msgPullY, setMsgPullY] = useState(0)
   const [msgRefreshing, setMsgRefreshing] = useState(false)
   const msgPullYRef = useRef(0)
+  const [profPullY, setProfPullY] = useState(0)
+  const [profRefreshing, setProfRefreshing] = useState(false)
+  const profPullYRef = useRef(0)
   const [msgTab, setMsgTab] = useState<'posts'|'market'>('posts')
   const [mktConvoPartners, setMktConvoPartners] = useState<string[]>(()=>{
     if (typeof window === 'undefined') return []
@@ -619,6 +622,7 @@ export default function App() {
   listingPhotoIdxRef.current = listingPhotoIdx
   msgPullYRef.current = msgPullY
   mktMyViewOpenRef.current = mktMyView
+  profPullYRef.current = profPullY
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -698,15 +702,16 @@ export default function App() {
         }
         return
       }
-      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages') return
-      // Vertical pull-to-refresh — runs for feed, market AND messages
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile') return
+      // Vertical pull-to-refresh — runs for all content pages
       if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
         if (e.cancelable) e.preventDefault()
         if (pageRef.current === 'market') setMktPullY(Math.min(dy * 0.45, 72))
         else if (pageRef.current === 'messages') setMsgPullY(Math.min(dy * 0.45, 72))
+        else if (pageRef.current === 'profile') setProfPullY(Math.min(dy * 0.45, 72))
         else setPullY(Math.min(dy * 0.45, 72))
       }
-      if (pageRef.current === 'market' || pageRef.current === 'messages') return
+      if (pageRef.current === 'market' || pageRef.current === 'messages' || pageRef.current === 'profile') return
       // Feed horizontal tab swipe
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
@@ -812,7 +817,15 @@ export default function App() {
         }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
-      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages') return
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile') return
+      if (pageRef.current === 'profile') {
+        if (profPullYRef.current > 52) {
+          setProfRefreshing(true); setProfPullY(0)
+          await loadPosts()
+          setProfRefreshing(false)
+        } else { setProfPullY(0) }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
       if (pageRef.current === 'market') {
         if (mktPullYRef.current > 52) {
           setMktRefreshing(true); setMktPullY(0)
@@ -1229,10 +1242,6 @@ export default function App() {
 
       {/* ─── MARKET ─── */}
       {page==='market' && <>
-        {/* Market pull-to-refresh indicator */}
-        <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:mktRefreshing?'52px':`${mktPullY}px`,transition:mktPullY===0?'height 0.25s ease':'none'}}>
-          <div className={mktRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:mktRefreshing?undefined:`rotate(${mktPullY*4}deg)`,transition:mktRefreshing?'none':'transform 0.1s'}}/>
-        </div>
         {/* Search bar */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'22px',padding:'10px 14px'}}>
@@ -1260,6 +1269,10 @@ export default function App() {
           <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCondFilter?C.accentBright:C.border}`,background:mktCondFilter?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktCondFilter?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setShowCondSheet(true)}>
             {mktCondFilter||'Condition'} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
+        </div>
+        {/* Pull-to-refresh indicator — between filters and grid */}
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:mktRefreshing?'52px':`${mktPullY}px`,transition:mktPullY===0?'height 0.25s ease':'none'}}>
+          <div className={mktRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:mktRefreshing?undefined:`rotate(${mktPullY*4}deg)`,transition:mktRefreshing?'none':'transform 0.1s'}}/>
         </div>
         {/* Grid */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',padding:'12px'}}>
@@ -1493,32 +1506,53 @@ export default function App() {
 
       {/* ─── PROFILE ─── */}
       {page==='profile' && <>
-        {topBar(<>My Profile <span style={{color:C.muted,fontSize:'0.9rem'}}>▾</span></>, <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.2rem'}}>⚙️</button>)}
         {/* Load rank when profile page is shown */}
-        {page==='profile' && userRank===0 && (() => {
+        {userRank===0 && (() => {
           sb.from('profiles').select('*',{count:'exact',head:true}).gt('total_fizzups',profile.total_fizzups).then(({count})=>setUserRank((count||0)+1))
           return null
         })()}
-        <div style={{display:'flex',margin:'16px',background:C.surface,borderRadius:'16px',overflow:'hidden',border:`1px solid ${C.border}`}}>
-          <div style={{flex:1,padding:'16px',textAlign:'center',borderRight:`1px solid ${C.border}`}}>
-            <div style={{fontSize:'1.4rem',marginBottom:'2px'}}>❤️</div>
-            <div style={{fontWeight:700,fontSize:'1.4rem'}}>{profile.total_fizzups}</div>
-            <div style={{fontSize:'0.82rem',color:C.muted}}>Karma</div>
+        {/* Banner + avatar header */}
+        <div style={{position:'relative',marginBottom:'0'}}>
+          {/* Blue gradient banner */}
+          <div style={{height:'100px',background:`linear-gradient(135deg, #1a3a5c 0%, #2563eb 100%)`,position:'relative'}}>
+            {/* Settings button */}
+            <button onClick={()=>setShowSettings(true)} style={{position:'absolute',top:'calc(10px + env(safe-area-inset-top))',right:'14px',background:'rgba(255,255,255,0.18)',border:'none',cursor:'pointer',borderRadius:'50%',width:'34px',height:'34px',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',backdropFilter:'blur(4px)'}}>⚙️</button>
           </div>
-          <div style={{flex:1,padding:'16px',textAlign:'center',borderRight:`1px solid ${C.border}`}}>
-            <div style={{fontSize:'1.4rem',marginBottom:'2px'}}>🏆</div>
-            <div style={{fontWeight:700,fontSize:'1.4rem'}}>#{userRank||'—'}</div>
-            <div style={{fontSize:'0.82rem',color:C.muted}}>Ranking</div>
-          </div>
-          <div style={{flex:1,padding:'16px',textAlign:'center'}}>
-            <div style={{fontSize:'1.4rem',marginBottom:'2px'}}>✏️</div>
-            <div style={{fontWeight:700,fontSize:'1.4rem'}}>{posts.filter(p=>p.user_id===profile.id).length}</div>
-            <div style={{fontSize:'0.82rem',color:C.muted}}>Posts</div>
+          {/* Avatar overlapping banner */}
+          <div style={{position:'absolute',bottom:'-36px',left:'16px',width:'72px',height:'72px',borderRadius:'50%',overflow:'hidden',border:`3px solid ${C.bg}`,background:avColor(profile.id),boxShadow:'0 2px 12px rgba(0,0,0,0.15)'}}>
+            <img src={avImg(profile.id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
           </div>
         </div>
-        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`}}>
+        {/* Username + bio area */}
+        <div style={{paddingTop:'46px',paddingLeft:'16px',paddingRight:'16px',paddingBottom:'16px',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{fontWeight:900,fontSize:'1.25rem',color:C.text,marginBottom:'2px'}}>{profile.username}</div>
+          <div style={{fontSize:'0.84rem',color:C.muted,marginBottom:'12px'}}>{profile.school}</div>
+          {/* Stats */}
+          <div style={{display:'flex',gap:'12px'}}>
+            <div style={{background:C.surface,borderRadius:'14px',padding:'12px 18px',flex:1,border:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
+                <span style={{fontSize:'1rem'}}>❤️</span>
+                <span style={{fontWeight:900,fontSize:'1.3rem',color:C.text}}>{profile.total_fizzups}</span>
+              </div>
+              <div style={{fontSize:'0.78rem',color:C.muted,fontWeight:600}}>Karma</div>
+            </div>
+            <div style={{background:C.surface,borderRadius:'14px',padding:'12px 18px',flex:1,border:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
+                <span style={{fontSize:'1rem'}}>🏆</span>
+                <span style={{fontWeight:900,fontSize:'1.3rem',color:C.text}}>#{userRank||'—'}</span>
+              </div>
+              <div style={{fontSize:'0.78rem',color:C.muted,fontWeight:600}}>Leaderboard</div>
+            </div>
+          </div>
+        </div>
+        {/* Pull-to-refresh indicator */}
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:profRefreshing?'52px':`${profPullY}px`,transition:profPullY===0?'height 0.25s ease':'none'}}>
+          <div className={profRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:profRefreshing?undefined:`rotate(${profPullY*4}deg)`,transition:profRefreshing?'none':'transform 0.1s'}}/>
+        </div>
+        {/* Tabs */}
+        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:50}}>
           {['Posts','Comments','Saved'].map((t,i)=>(
-            <div key={t} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.92rem',fontWeight:i===0?700:400,color:i===0?C.text:C.muted,borderBottom:i===0?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer'}}>{t}</div>
+            <div key={t} style={{flex:1,padding:'12px 10px',textAlign:'center',fontSize:'0.92rem',fontWeight:i===0?800:600,color:i===0?C.text:C.muted,borderBottom:i===0?`2.5px solid ${C.text}`:'2.5px solid transparent',cursor:'pointer',transition:'color 0.15s'}}>{t}</div>
           ))}
         </div>
         {posts.filter(p=>p.user_id===profile.id).map(p=><PostCard key={p.id} p={p}/>)}
