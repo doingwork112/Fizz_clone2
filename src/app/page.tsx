@@ -518,7 +518,7 @@ export default function App() {
   // ── AUTH ──
   if (!session||!profile) return (
     <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
-      <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright,letterSpacing:'-1px'}}>fizz.</div>
+      <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright,letterSpacing:'-1px'}}>heha</div>
       <div style={{width:'100%',maxWidth:'360px'}}>
         <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
           {(['login','register'] as const).map(t=>(
@@ -668,7 +668,7 @@ export default function App() {
         {topBar('Search')}
         <div style={{display:'flex',alignItems:'center',gap:'10px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'24px',padding:'10px 16px',margin:'12px 16px'}}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:'0.95rem',outline:'none',fontFamily:'inherit'}} placeholder="Search Fizz" value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+          <input style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:'0.95rem',outline:'none',fontFamily:'inherit'}} placeholder="Search heha" value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
         </div>
         {searchRes.map(p=><PostCard key={p.id} p={p}/>)}
         {searchQ&&searchRes.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>没有找到结果</div>}
@@ -1052,7 +1052,7 @@ export default function App() {
                 <span style={{color:C.muted}}>▾</span>
               </div>
             </div>
-            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none' as const,color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'16px'}} placeholder="Add ReFizz caption..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
+            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none' as const,color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'16px'}} placeholder="Add caption..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
             <div style={{border:'1px solid '+C.border,borderRadius:'14px',padding:'14px',background:C.surface}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
                 <div style={{width:'28px',height:'28px',borderRadius:'50%',background:repostTarget.is_anon?avColor(repostTarget.user_id):(repostTarget.profiles?.avatar_color||avColor(repostTarget.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',color:'white',fontWeight:700}}>{repostTarget.is_anon?anonEmoji(repostTarget.user_id):(repostTarget.profiles?.avatar_initials||'?')}</div>

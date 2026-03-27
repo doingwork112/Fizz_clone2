@@ -10,13 +10,13 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: '沸点 – 你的校园社区',
+  title: 'heha',
   description: '匿名真实地与你的校友连接',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: '沸点',
+    title: 'heha',
   },
   formatDetection: {
     telephone: false,
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="沸点" />
+        <meta name="apple-mobile-web-app-title" content="heha" />
       </head>
       <body>{children}</body>
     </html>
