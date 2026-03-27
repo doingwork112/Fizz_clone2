@@ -50,7 +50,6 @@ body {
 
 body.modal-open {
   overflow: hidden !important;
-  touch-action: none;
   position: fixed;
   width: 100%;
 }

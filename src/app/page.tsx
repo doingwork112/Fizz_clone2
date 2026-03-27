@@ -473,43 +473,66 @@ export default function App() {
 
   const FEED_TABS = ['Top',"Fizzin'",'New'] as const
 
-  // Swipe handlers — called directly via React onTouchStart/Move/End on feed wrapper
+  // Swipe — use refs to always have current values in document listeners
   const swipeLocked = useRef<'h'|'v'|null>(null)
-  const feedRef = useRef<HTMLDivElement>(null)
-  function onFeedTS(e: React.TouchEvent) {
-    touchStartY.current = e.touches[0].clientY
-    touchStartX.current = e.touches[0].clientX
-    swipeLocked.current = null
-  }
-  function onFeedTM(e: React.TouchEvent) {
-    const dy = e.touches[0].clientY - touchStartY.current
-    const dx = e.touches[0].clientX - touchStartX.current
-    // Lock direction after 10px
-    if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-      swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+  const feedTabRef = useRef(feedTab)
+  const pageRef = useRef(page)
+  const pullYRef = useRef(pullY)
+  const swipeXRef = useRef(0)
+  feedTabRef.current = feedTab
+  pageRef.current = page
+  pullYRef.current = pullY
+
+  useEffect(() => {
+    let sx = 0, sy = 0, dx = 0, dy = 0
+    function onTS(e: TouchEvent) {
+      sx = e.touches[0].clientX
+      sy = e.touches[0].clientY
+      dx = 0; dy = 0
+      swipeLocked.current = null
     }
-    if (swipeLocked.current === 'h') {
-      setSwipeX(dx)
+    function onTM(e: TouchEvent) {
+      if (pageRef.current !== 'feed') return
+      dx = e.touches[0].clientX - sx
+      dy = e.touches[0].clientY - sy
+      if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+        swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+      }
+      if (swipeLocked.current === 'h' && e.cancelable) {
+        e.preventDefault()
+        swipeXRef.current = dx
+        setSwipeX(dx)
+      }
+      if (swipeLocked.current === 'v' && window.scrollY === 0 && dy > 0) {
+        setPullY(Math.min(dy * 0.45, 72))
+      }
     }
-    if (swipeLocked.current === 'v' && window.scrollY === 0 && dy > 0) {
-      setPullY(Math.min(dy * 0.45, 72))
+    async function onTE() {
+      if (pageRef.current !== 'feed') return
+      setSwipeX(0)
+      if (pullYRef.current > 52) {
+        setRefreshing(true); setPullY(0)
+        await loadPosts()
+        setRefreshing(false)
+      } else { setPullY(0) }
+      if (swipeLocked.current === 'h' && Math.abs(swipeXRef.current) > 40) {
+        const tabs = ['Top',"Fizzin'",'New'] as const
+        const idx = tabs.indexOf(feedTabRef.current as any)
+        if (swipeXRef.current < 0 && idx < tabs.length - 1) setFeedTab(tabs[idx + 1])
+        if (swipeXRef.current > 0 && idx > 0) setFeedTab(tabs[idx - 1])
+      }
+      swipeLocked.current = null
+      swipeXRef.current = 0
     }
-  }
-  async function onFeedTE() {
-    const dx = swipeX
-    setSwipeX(0)
-    if (pullY > 52) {
-      setRefreshing(true); setPullY(0)
-      await loadPosts()
-      setRefreshing(false)
-    } else { setPullY(0) }
-    if (swipeLocked.current === 'h' && Math.abs(dx) > 40) {
-      const idx = FEED_TABS.indexOf(feedTab as any)
-      if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
-      if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
+    document.addEventListener('touchstart', onTS, { passive: true })
+    document.addEventListener('touchmove', onTM, { passive: false })
+    document.addEventListener('touchend', onTE, { passive: true })
+    return () => {
+      document.removeEventListener('touchstart', onTS)
+      document.removeEventListener('touchmove', onTM)
+      document.removeEventListener('touchend', onTE)
     }
-    swipeLocked.current = null
-  }
+  }, [])
 
   // ── Post Card ──
   function PostCard({ p }: { p: Post }) {
@@ -658,7 +681,7 @@ export default function App() {
     >
 
       {/* ─── FEED ─── */}
-      {page==='feed' && <div ref={feedRef} onTouchStart={onFeedTS} onTouchMove={onFeedTM} onTouchEnd={onFeedTE} style={{touchAction:'pan-y'}}>
+      {page==='feed' && <div>
         {topBar(
           <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>{profile.school}</span></>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
