@@ -1505,7 +1505,7 @@ export default function App() {
       </>}
 
       {/* ─── PROFILE ─── */}
-      {page==='profile' && <>
+      {page==='profile' && <div className="feed-swipe">
         {/* Load rank when profile page is shown */}
         {userRank===0 && (() => {
           sb.from('profiles').select('*',{count:'exact',head:true}).gt('total_fizzups',profile.total_fizzups).then(({count})=>setUserRank((count||0)+1))
@@ -1555,7 +1555,7 @@ export default function App() {
             <div key={t} style={{flex:1,padding:'12px 10px',textAlign:'center',fontSize:'0.92rem',fontWeight:i===0?800:600,color:i===0?C.text:C.muted,borderBottom:i===0?`2.5px solid ${C.text}`:'2.5px solid transparent',cursor:'pointer',transition:'color 0.15s'}}>{t}</div>
           ))}
         </div>
-        {posts.filter(p=>p.user_id===profile.id).map(p=><PostCard key={p.id} p={p}/>)}
+        {posts.filter(p=>p.user_id===profile.id).map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
         {posts.every(p=>p.user_id!==profile.id)&&(
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}>
             <div style={{fontSize:'3rem',opacity:.4}}>✏️</div>
@@ -1567,7 +1567,7 @@ export default function App() {
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
-      </>}
+      </div>}
 
       {/* Dismiss post menu backdrop */}
       {showPostMenu&&<div onClick={()=>setShowPostMenu(null)} style={{position:'fixed',inset:0,zIndex:199}}/>}
@@ -1581,7 +1581,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 4px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 4px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
