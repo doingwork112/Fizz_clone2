@@ -24,28 +24,21 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-html {
+html, body {
   overscroll-behavior-y: none;
   background: #ffffff;
-  overflow: hidden;
-  height: 100%;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
-  html { background: #0f0f13; }
+  html, body { background: #0f0f13; }
 }
 
 body {
-  background: var(--bg);
   color: var(--text);
   font-family: 'Nunito', 'SF Pro Rounded', -apple-system, sans-serif;
   font-weight: 700;
-  min-height: 100vh;
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior-y: none;
-  -webkit-overflow-scrolling: touch;
-  -webkit-font-smoothing: antialiased;
 }
 
 body.modal-open {

@@ -50,6 +50,13 @@ export default function App() {
   const { theme, setTheme, resolved } = useTheme()
   const C = resolved === 'light' ? LIGHT : DARK
 
+  // Sync html/body background with theme so no dark flash behind keyboard
+  useEffect(() => {
+    const bg = resolved === 'light' ? '#ffffff' : '#0f0f13'
+    document.documentElement.style.background = bg
+    document.body.style.background = bg
+  }, [resolved])
+
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<Profile|null>(null)
   const [authTab, setAuthTab] = useState<'login'|'register'>('login')
