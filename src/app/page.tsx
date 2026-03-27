@@ -125,6 +125,10 @@ export default function App() {
   const [showPostMenu, setShowPostMenu] = useState<string|null>(null)
   const showPostRef = useRef(false)
   const showRepostRef = useRef(false)
+  const postSheetRef = useRef<HTMLDivElement>(null)
+  const postDragTrack = useRef(0)
+  const repostSheetRef = useRef<HTMLDivElement>(null)
+  const repostDragTrack = useRef(0)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -555,8 +559,9 @@ export default function App() {
       }
       // Bottom sheet open: let the sheet handle its own drag, don't touch background
       if (showPostRef.current || showRepostRef.current) return
-      // Post detail open: handle right swipe to go back; let vertical scroll pass through
+      // Post detail open: swipe-back (right). Override lock if clearly going right.
       if (selectedPostRef.current) {
+        if (dx > 8) swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0 && e.cancelable) {
           e.preventDefault()
           swipeXRef.current = dx
@@ -1056,11 +1061,32 @@ export default function App() {
       {showPost && (<>
         <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.18)'}}/>
         <div
+          ref={postSheetRef}
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:showTagPicker?'80vh':'58vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}
-          onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
-          onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0)setPostDragY(dy)}}
-          onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:showTagPicker?'80vh':'58vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform'}}
+          onTouchStart={e=>{postDragStart.current=e.touches[0].clientY; postDragTrack.current=0}}
+          onTouchMove={e=>{
+            const dy=e.touches[0].clientY-postDragStart.current
+            if(dy>0 && postSheetRef.current){
+              postDragTrack.current=dy
+              postSheetRef.current.style.transition='none'
+              postSheetRef.current.style.transform=`translateY(${dy}px)`
+            }
+          }}
+          onTouchEnd={()=>{
+            if(postDragTrack.current>80){
+              if(postSheetRef.current){
+                postSheetRef.current.style.transition='transform 0.3s ease'
+                postSheetRef.current.style.transform='translateY(100%)'
+              }
+              setTimeout(()=>{setShowPost(false);setPostText('');setPostImgs([]);setPostPrevs([]);setPostTag('');setShowTagPicker(false)},300)
+            } else if(postSheetRef.current){
+              postSheetRef.current.style.transition='transform 0.3s cubic-bezier(0.32,0.72,0,1)'
+              postSheetRef.current.style.transform='translateY(0)'
+              setTimeout(()=>{if(postSheetRef.current)postSheetRef.current.style.transition=''},300)
+            }
+            postDragTrack.current=0
+          }}
         >
             <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}>
               <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
@@ -1341,10 +1367,31 @@ export default function App() {
         <div onClick={closeRepost} className={repostClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:499,background:'rgba(0,0,0,0.18)'}}/>
         <div
           className={repostClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:500,background:C.bg,borderRadius:'22px 22px 0 0',transform:`translateY(${repostDragY}px)`,transition:repostDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:'75vh',display:'flex',flexDirection:'column' as const,boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}
-          onTouchStart={e=>{repostDragStart.current=e.touches[0].clientY}}
-          onTouchMove={e=>{const dy=e.touches[0].clientY-repostDragStart.current; if(dy>0)setRepostDragY(dy)}}
-          onTouchEnd={()=>{if(repostDragY>80)closeRepost();else setRepostDragY(0)}}
+          ref={repostSheetRef}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:500,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:'75vh',display:'flex',flexDirection:'column' as const,boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform'}}
+          onTouchStart={e=>{repostDragStart.current=e.touches[0].clientY; repostDragTrack.current=0}}
+          onTouchMove={e=>{
+            const dy=e.touches[0].clientY-repostDragStart.current
+            if(dy>0 && repostSheetRef.current){
+              repostDragTrack.current=dy
+              repostSheetRef.current.style.transition='none'
+              repostSheetRef.current.style.transform=`translateY(${dy}px)`
+            }
+          }}
+          onTouchEnd={()=>{
+            if(repostDragTrack.current>80){
+              if(repostSheetRef.current){
+                repostSheetRef.current.style.transition='transform 0.3s ease'
+                repostSheetRef.current.style.transform='translateY(100%)'
+              }
+              setTimeout(()=>{setShowRepost(false);setRepostClosing(false);setRepostText('');setRepostIsComment(false);setRepostOriginalPostText('');setRepostTarget(null)},300)
+            } else if(repostSheetRef.current){
+              repostSheetRef.current.style.transition='transform 0.3s cubic-bezier(0.32,0.72,0,1)'
+              repostSheetRef.current.style.transform='translateY(0)'
+              setTimeout(()=>{if(repostSheetRef.current)repostSheetRef.current.style.transition=''},300)
+            }
+            repostDragTrack.current=0
+          }}
         >
           {/* drag handle */}
           <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',flexShrink:0}}>
