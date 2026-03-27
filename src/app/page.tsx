@@ -31,6 +31,7 @@ const DARK =  { bg:'#0f0f13', surface:'#18181f', surface2:'#222230', border:'#2e
 
 const ANON_EMOJIS = ['🦊','🐧','🎩','🦄','🌈','🔮','🎪','🦋','🌊','🎭','🐻','🦁']
 const AV_COLORS = ['#1a3a5c','#2563eb','#7c3aed','#0891b2','#15803d','#b45309','#be123c','#0f766e']
+const AV_LOGOS = ['/av1.jpg','/av2.jpg','/av3.jpg']
 const SCHOOLS = ['北京大学','清华大学','复旦大学','上海交通大学','浙江大学','南京大学','武汉大学','中山大学','华中科技大学','四川大学']
 
 function ago(ts: string) {
@@ -42,6 +43,7 @@ function ago(ts: string) {
 }
 function anonEmoji(uid: string) { return ANON_EMOJIS[uid.charCodeAt(0) % ANON_EMOJIS.length] }
 function avColor(uid: string) { return AV_COLORS[uid.charCodeAt(0) % AV_COLORS.length] }
+function avImg(uid: string) { return AV_LOGOS[uid.charCodeAt(0) % AV_LOGOS.length] }
 
 export default function App() {
   const sb = createClient()
@@ -97,6 +99,8 @@ export default function App() {
   const [postText, setPostText] = useState('')
   const [postAnon, setPostAnon] = useState(true)
   const [posting, setPosting] = useState(false)
+  const [fabExpanded, setFabExpanded] = useState(true)
+  const lastScrollY = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
 
@@ -115,7 +119,13 @@ export default function App() {
     }
     sb.auth.getSession().then(({ data }) => { setSession(data.session); if (data.session) loadProfile(data.session.user.id) })
     const { data: { subscription } } = sb.auth.onAuthStateChange((_e, s) => { setSession(s); if (s) loadProfile(s.user.id); else setProfile(null) })
-    return () => subscription.unsubscribe()
+    const onScroll = () => {
+      const y = window.scrollY
+      setFabExpanded(y < 60 || y < lastScrollY.current)
+      lastScrollY.current = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { subscription.unsubscribe(); window.removeEventListener('scroll', onScroll) }
   }, [])
 
   async function loadProfile(uid: string) {
@@ -440,11 +450,9 @@ export default function App() {
     const cmtsOpen = !!openCmts[p.id]
 
     return (
-      <div style={{ borderBottom:`1px solid ${C.border}`, padding:'14px 16px', display:'flex', gap:'10px', background:C.bg }}>
+      <div style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg }}>
         {/* avatar */}
-        <div style={{ width:'40px', height:'40px', borderRadius:'50%', background: isAnon ? avColor(p.user_id) : (p.profiles?.avatar_color||avColor(p.user_id)), display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1rem', color:'white', fontWeight:700, flexShrink:0 }}>
-          {isAnon ? anonEmoji(p.user_id) : (p.profiles?.avatar_initials||'?')}
-        </div>
+        <img src={avImg(p.user_id)} alt="" style={{ width:'44px', height:'44px', borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
         {/* main */}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px',flexWrap:'wrap'}}>
@@ -570,12 +578,12 @@ export default function App() {
   )
 
   return (
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'64px'}}>
+    <div style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'72px'}}>
 
       {/* ─── FEED ─── */}
       {page==='feed' && <>
         {topBar(
-          <><div style={{width:'32px',height:'32px',borderRadius:'50%',background:C.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem'}}>🎓</div>{profile.school}</>,
+          <><img src="/av1.jpg" alt="" style={{width:'32px',height:'32px',borderRadius:'50%',objectFit:'cover'}}/>{profile.school}</>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
             <span style={{fontSize:'0.78rem',color:C.green,fontWeight:700,display:'flex',alignItems:'center',gap:'4px'}}>
               <span style={{width:'7px',height:'7px',borderRadius:'50%',background:C.green,display:'inline-block'}}/>
@@ -593,8 +601,9 @@ export default function App() {
         </div>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
         {posts.length===0&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'72px',right:'50%',transform:'translateX(calc(50% - 16px + 215px - 16px)',background:C.accent,color:'white',border:'none',borderRadius:'24px',padding:'12px 22px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:`0 4px 16px ${C.shadow}`,zIndex:150}}>
-          + Post
+        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'80px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+          <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
+          <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
       </>}
 
@@ -614,7 +623,7 @@ export default function App() {
             </div>
           ) : convos.map(({user:u,lastMsg})=>(
             <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
-              <div style={{width:'46px',height:'46px',borderRadius:'50%',background:avColor(u.id),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'1.4rem'}}>{anonEmoji(u.id)}</div>
+              <img src={avImg(u.id)} alt="" style={{width:'46px',height:'46px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
                 <div style={{fontSize:'0.85rem',color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lastMsg?.text||'开始对话'}</div>
@@ -626,7 +635,7 @@ export default function App() {
           <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const}}>
               <button onClick={()=>setChatTarget(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
-              <div style={{width:'36px',height:'36px',borderRadius:'50%',background:avColor(chatTarget.id),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem'}}>{anonEmoji(chatTarget.id)}</div>
+              <img src={avImg(chatTarget.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
               <div style={{fontWeight:700,flex:1}}>Anonymous</div>
               <button onClick={()=>setShowChatMenu(v=>!v)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1.2rem',padding:'4px'}}>•••</button>
               {showChatMenu&&(
@@ -733,8 +742,9 @@ export default function App() {
           ))}
         </div>
         {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>暂无商品</div>}
-        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'72px',right:'50%',transform:'translateX(calc(50% - 16px + 215px - 16px)',background:C.accent,color:'white',border:'none',borderRadius:'24px',padding:'12px 22px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:`0 4px 16px ${C.shadow}`,zIndex:150}}>
-          + List
+        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'80px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+          <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
+          <span style={{maxWidth:fabExpanded?'60px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>List</span>
         </button>
       </>}
 
@@ -776,8 +786,9 @@ export default function App() {
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'72px',right:'50%',transform:'translateX(calc(50% - 16px + 215px - 16px)',background:C.accent,color:'white',border:'none',borderRadius:'24px',padding:'12px 22px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',boxShadow:`0 4px 16px ${C.shadow}`,zIndex:150}}>
-          + Post
+        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'80px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+          <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
+          <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
       </>}
 
