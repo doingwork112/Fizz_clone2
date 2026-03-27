@@ -123,6 +123,8 @@ export default function App() {
   const [repostDragY, setRepostDragY] = useState(0)
   const repostDragStart = useRef(0)
   const [showPostMenu, setShowPostMenu] = useState<string|null>(null)
+  const showPostRef = useRef(false)
+  const showRepostRef = useRef(false)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -535,6 +537,8 @@ export default function App() {
   pageRef.current = page
   pullYRef.current = pullY
   selectedPostRef.current = selectedPost
+  showPostRef.current = showPost
+  showRepostRef.current = showRepost
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -549,6 +553,8 @@ export default function App() {
       if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
         swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
       }
+      // Bottom sheet open: let the sheet handle its own drag, don't touch background
+      if (showPostRef.current || showRepostRef.current) return
       // Post detail open: handle right swipe to go back; let vertical scroll pass through
       if (selectedPostRef.current) {
         if (swipeLocked.current === 'h' && dx > 0 && e.cancelable) {
@@ -579,6 +585,7 @@ export default function App() {
       }
     }
     async function onTE() {
+      if (showPostRef.current || showRepostRef.current) { swipeLocked.current = null; swipeXRef.current = 0; return }
       // Post detail: complete swipe-back or snap back
       if (selectedPostRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
@@ -1047,10 +1054,10 @@ export default function App() {
 
       {/* ─── POST MODAL — bottom sheet ─── */}
       {showPost && (<>
-        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.3)'}}/>
+        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.18)'}}/>
         <div
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:showTagPicker?'80vh':'55vh',display:'flex',flexDirection:'column',boxShadow:'0 -4px 30px rgba(0,0,0,0.15)'}}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:showTagPicker?'80vh':'58vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}
           onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
           onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0)setPostDragY(dy)}}
           onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
@@ -1331,10 +1338,10 @@ export default function App() {
       )}
 
       {showRepost&&repostTarget&&(<>
-        <div onClick={closeRepost} className={repostClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:499,background:'rgba(0,0,0,0.35)'}}/>
+        <div onClick={closeRepost} className={repostClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:499,background:'rgba(0,0,0,0.18)'}}/>
         <div
           className={repostClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:500,background:C.bg,borderRadius:'16px 16px 0 0',transform:`translateY(${repostDragY}px)`,transition:repostDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:'75vh',display:'flex',flexDirection:'column' as const,boxShadow:'0 -4px 30px rgba(0,0,0,0.15)'}}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:500,background:C.bg,borderRadius:'22px 22px 0 0',transform:`translateY(${repostDragY}px)`,transition:repostDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:'75vh',display:'flex',flexDirection:'column' as const,boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}
           onTouchStart={e=>{repostDragStart.current=e.touches[0].clientY}}
           onTouchMove={e=>{const dy=e.touches[0].clientY-repostDragStart.current; if(dy>0)setRepostDragY(dy)}}
           onTouchEnd={()=>{if(repostDragY>80)closeRepost();else setRepostDragY(0)}}
