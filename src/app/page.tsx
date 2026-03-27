@@ -450,20 +450,21 @@ export default function App() {
   const sheet: React.CSSProperties = { background:C.bg, borderRadius:'20px 20px 0 0', padding:'20px 16px', maxHeight:'92vh', overflowY:'auto' }
 
   // Lock/unlock body scroll for modals
+  const savedScrollY = useRef(0)
   function lockBody() {
-    scrollYBefore.current = window.scrollY
+    savedScrollY.current = window.scrollY
     document.body.classList.add('modal-open')
-    document.body.style.top = `-${scrollYBefore.current}px`
+    document.body.style.top = `-${savedScrollY.current}px`
   }
   function unlockBody() {
     document.body.classList.remove('modal-open')
     document.body.style.top = ''
-    window.scrollTo(0, scrollYBefore.current)
+    window.scrollTo(0, savedScrollY.current)
   }
 
   function openPostModal() {
     lockBody()
-    openPostModal()
+    setShowPost(true)
   }
   function closePost() {
     setPostClosing(true)
@@ -679,7 +680,7 @@ export default function App() {
     >
 
       {/* ─── FEED ─── */}
-      {page==='feed' && <>
+      {page==='feed' && <div style={{touchAction:'pan-y pinch-zoom'}}>
         {topBar(
           <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>{profile.school}</span></>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -711,7 +712,7 @@ export default function App() {
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
-      </>}
+      </div>}
 
       {/* ─── MESSAGES ─── */}
       {page==='messages' && <>
@@ -899,7 +900,7 @@ export default function App() {
       </>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(4px + env(safe-area-inset-bottom, 0px))`}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(18px + env(safe-area-inset-bottom, 0px))`}}>
         {[
           {id:'feed',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
           {id:'messages',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
