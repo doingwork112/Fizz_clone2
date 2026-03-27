@@ -644,14 +644,16 @@ export default function App() {
             <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',padding:0}}>⚙️</button>
           </div>
         )}
-        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'sticky',top:'53px',zIndex:99,position:'relative' as any}}>
-          {(['Top',"Fizzin'",'New'] as const).map(t=>(
-            <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?700:400,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
-              {t}
-            </div>
-          ))}
-          {/* sliding indicator */}
-          <div style={{position:'absolute',bottom:0,height:'2px',width:'33.333%',background:C.text,left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
+        <div style={{background:C.bg,position:'sticky',top:'53px',zIndex:99,borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',position:'relative'}}>
+            {(['Top',"Fizzin'",'New'] as const).map(t=>(
+              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?700:400,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
+                {t}
+              </div>
+            ))}
+            {/* sliding indicator */}
+            <div style={{position:'absolute',bottom:0,height:'2px',width:'33.333%',background:C.text,left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
+          </div>
         </div>
         {/* pull-to-refresh indicator */}
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
