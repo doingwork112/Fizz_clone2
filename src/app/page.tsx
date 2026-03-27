@@ -110,6 +110,7 @@ export default function App() {
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
+  const [swipeX, setSwipeX] = useState(0)
 
   const [showListing, setShowListing] = useState(false)
   const [lf, setLf] = useState({ title:'', price:'', cat:'clothes', desc:'', condition:'Good' })
@@ -468,10 +469,15 @@ export default function App() {
     if (window.scrollY === 0 && dy > 0 && Math.abs(dy) > Math.abs(dx)) {
       setPullY(Math.min(dy * 0.45, 72))
     }
+    // track horizontal swipe for tab indicator
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      setSwipeX(dx)
+    }
   }
   async function handleTouchEnd(e: React.TouchEvent) {
     const dy = e.changedTouches[0].clientY - touchStartY.current
     const dx = e.changedTouches[0].clientX - touchStartX.current
+    setSwipeX(0)
     // pull-to-refresh
     if (page === 'feed' && pullY > 52) {
       setRefreshing(true); setPullY(0)
@@ -626,7 +632,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'DM Sans',-apple-system,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'SF Pro Rounded','Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased'}}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -651,8 +657,8 @@ export default function App() {
                 {t}
               </div>
             ))}
-            {/* sliding indicator */}
-            <div style={{position:'absolute',bottom:0,height:'2px',width:'33.333%',background:C.text,left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
+            {/* sliding indicator — follows finger */}
+            <div style={{position:'absolute',bottom:0,height:'2px',width:'33.333%',background:C.text,left:`${Math.max(0,Math.min(66.666,((['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333)+(-swipeX/(typeof window!=='undefined'?window.innerWidth:375)*33.333)))}%`,transition:swipeX===0?'left 0.25s cubic-bezier(0.4,0,0.2,1)':'none'}}/>
           </div>
         </div>
         {/* pull-to-refresh indicator */}
@@ -870,28 +876,26 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ─── POST MODAL (Fizz-style full-screen) ─── */}
-      {showPost && (
+      {/* ─── POST MODAL (Fizz-style bottom sheet) ─── */}
+      {showPost && (<>
+        {/* dimmed overlay */}
+        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.35)'}}/>
+        {/* sheet */}
         <div
           className={postClosing ? 'slide-down' : 'slide-up'}
-          style={{position:'fixed',inset:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)'}}
+          style={{position:'fixed',top:'5vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)'}}
+          onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
+          onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
+          onTouchEnd={()=>{ if(postDragY>110) closePost(); else setPostDragY(0) }}
         >
           {/* drag handle */}
-          <div
-            style={{display:'flex',justifyContent:'center',padding:'10px 0 4px',cursor:'grab',flexShrink:0}}
-            onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
-            onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
-            onTouchEnd={()=>{ if(postDragY>110) closePost(); else setPostDragY(0) }}
-          >
+          <div style={{display:'flex',justifyContent:'center',padding:'10px 0 4px',cursor:'grab',flexShrink:0}}>
             <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
           </div>
-          {/* header */}
-          <div style={{display:'flex',alignItems:'center',padding:'8px 16px 12px',flexShrink:0}}>
-            <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'4px',marginRight:'auto'}}>
+          {/* close button */}
+          <div style={{padding:'4px 16px 8px',flexShrink:0}}>
+            <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'4px'}}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-            <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0)} style={{background:postAnon?C.accentBright:'#6b7280',color:'white',border:'none',borderRadius:'20px',padding:'8px 22px',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0)||posting?.5:1,fontFamily:'inherit',transition:'background 0.2s'}}>
-              {posting?'…':'Post'}
             </button>
           </div>
           {/* author row */}
@@ -913,15 +917,27 @@ export default function App() {
             />
             {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'130px',objectFit:'cover'}}/>)}</div>}
           </div>
-          {/* bottom toolbar */}
-          <div style={{display:'flex',alignItems:'center',gap:'16px',padding:'12px 16px',borderTop:`1px solid ${C.border}`,paddingBottom:`calc(12px + env(safe-area-inset-bottom))`,flexShrink:0}}>
-            <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center'}}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+          {/* bottom toolbar — Tag, Photo, MEME, GIF, Poll, Mic, Post */}
+          <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'10px 16px',borderTop:`1px solid ${C.border}`,paddingBottom:`calc(10px + env(safe-area-inset-bottom))`,flexShrink:0}}>
+            <button style={{display:'flex',alignItems:'center',gap:'4px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'20px',padding:'6px 12px',fontSize:'0.82rem',fontWeight:600,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>+ Tag</button>
+            <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',padding:'6px'}}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
               <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
             </label>
+            <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',fontWeight:800,fontSize:'0.8rem',color:C.muted,fontFamily:'inherit',letterSpacing:'-0.5px'}}>MEME</button>
+            <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',fontWeight:800,fontSize:'0.8rem',color:C.muted,fontFamily:'inherit',letterSpacing:'-0.5px',border:`1px solid ${C.border}`,borderRadius:'6px'}}>GIF</button>
+            <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',color:C.muted}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            </button>
+            <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',color:C.muted}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+            </button>
+            <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0)} style={{marginLeft:'auto',background:postAnon?'#a78bfa':'#6b7280',color:'white',border:'none',borderRadius:'20px',padding:'8px 20px',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0)||posting?.5:1,fontFamily:'inherit',transition:'background 0.2s'}}>
+              {posting?'…':'Post'}
+            </button>
           </div>
         </div>
-      )}
+      </>)}
 
       {/* ─── LISTING MODAL ─── */}
       {showListing && (

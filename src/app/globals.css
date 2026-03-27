@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&display=swap');
 
 :root {
   --bg: #0f0f13;
@@ -24,13 +25,17 @@
 
 html {
   overscroll-behavior-y: none;
-  background: var(--bg);
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html { background: #0f0f13; }
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Nunito', 'SF Pro Rounded', -apple-system, sans-serif;
   min-height: 100vh;
   overscroll-behavior-y: none;
 }
@@ -51,6 +56,18 @@ body {
   to   { transform: translateY(110%); }
 }
 .slide-down { animation: slideDown 0.28s cubic-bezier(0.32,0.72,0,1) forwards; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fadeIn 0.25s ease forwards; }
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.fade-out { animation: fadeOut 0.22s ease forwards; }
 
 .font-fizz { font-family: 'Nunito', sans-serif; }
 
