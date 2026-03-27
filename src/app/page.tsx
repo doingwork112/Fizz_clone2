@@ -119,6 +119,10 @@ export default function App() {
   const [detailClosing, setDetailClosing] = useState(false)
   const selectedPostRef = useRef<any>(null)
   const postDetailRef = useRef<HTMLDivElement>(null)
+  const [repostClosing, setRepostClosing] = useState(false)
+  const [repostDragY, setRepostDragY] = useState(0)
+  const repostDragStart = useRef(0)
+  const [showPostMenu, setShowPostMenu] = useState<string|null>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -490,6 +494,14 @@ export default function App() {
     }
     setTimeout(() => setSelectedPost(null), 290)
   }
+  function closeRepost() {
+    setRepostClosing(true)
+    setRepostDragY(0)
+    setTimeout(() => {
+      setShowRepost(false); setRepostClosing(false); setRepostText('')
+      setRepostIsComment(false); setRepostOriginalPostText(''); setRepostTarget(null)
+    }, 350)
+  }
 
     const FEED_TABS = ['Top',"Fizzin'",'New'] as const
   const POST_TAGS = [
@@ -675,8 +687,26 @@ export default function App() {
             <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             </button>
-            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0,fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
-            {p.user_id===profile!.id && <button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.82rem',fontWeight:700,padding:0,marginLeft:'auto',fontFamily:'inherit'}}>删除</button>}
+            <div style={{position:'relative',marginLeft:'auto'}}>
+              <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
+              {showPostMenu===p.id&&(
+                <div style={{position:'absolute',right:0,bottom:'30px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 24px ${C.shadow}`}}>
+                  <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                    <span>🚨</span> Report
+                  </button>
+                  {p.user_id===profile!.id&&(
+                    <button onClick={()=>{deletePst(p.id);setShowPostMenu(null)}} style={{width:'100%',padding:'13px 16px',background:'none',border:`1px solid ${C.border}`,borderTop:`1px solid ${C.border}`,borderLeft:'none',borderRight:'none',borderBottom:'none',cursor:'pointer',color:C.red,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                      <span>🗑️</span> Delete
+                    </button>
+                  )}
+                  {p.user_id!==profile!.id&&(
+                    <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:`1px solid ${C.border}`,borderTop:`1px solid ${C.border}`,borderLeft:'none',borderRight:'none',borderBottom:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                      <span>🚫</span> Block this user
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           )})()}
           {/* comments */}
@@ -994,6 +1024,9 @@ export default function App() {
         </button>
       </>}
 
+      {/* Dismiss post menu backdrop */}
+      {showPostMenu&&<div onClick={()=>setShowPostMenu(null)} style={{position:'fixed',inset:0,zIndex:199}}/>}
+
       {/* ─── BOTTOM NAV ─── */}
       <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(34px + env(safe-area-inset-bottom, 0px))`}}>
         {[
@@ -1297,25 +1330,46 @@ export default function App() {
         </div>
       )}
 
-      {showRepost&&repostTarget&&(
-        <div style={{position:'fixed',inset:0,background:C.bg,zIndex:500,display:'flex',flexDirection:'column' as const}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:'1px solid '+C.border}}>
-            <button onClick={()=>{setShowRepost(false);setRepostText('');setRepostIsComment(false);setRepostOriginalPostText('')}} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.3rem',color:C.text}}>✕</button>
-            <button onClick={submitRepost} disabled={reposting} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'8px 20px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{reposting?'...':'Post'}</button>
+      {showRepost&&repostTarget&&(<>
+        <div onClick={closeRepost} className={repostClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:499,background:'rgba(0,0,0,0.35)'}}/>
+        <div
+          className={repostClosing?'slide-down':'slide-up'}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:500,background:C.bg,borderRadius:'16px 16px 0 0',transform:`translateY(${repostDragY}px)`,transition:repostDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:'75vh',display:'flex',flexDirection:'column' as const,boxShadow:'0 -4px 30px rgba(0,0,0,0.15)'}}
+          onTouchStart={e=>{repostDragStart.current=e.touches[0].clientY}}
+          onTouchMove={e=>{const dy=e.touches[0].clientY-repostDragStart.current; if(dy>0)setRepostDragY(dy)}}
+          onTouchEnd={()=>{if(repostDragY>80)closeRepost();else setRepostDragY(0)}}
+        >
+          {/* drag handle */}
+          <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',flexShrink:0}}>
+            <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
           </div>
-          <div style={{flex:1,overflowY:'auto' as const,padding:'16px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
-              <div style={{width:'40px',height:'40px',borderRadius:'50%',background:repostAnon?avColor(profile.id):profile.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700}}>{repostAnon?anonEmoji(profile.id):profile.avatar_initials}</div>
+          {/* header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 16px 8px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={closeRepost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'2px',display:'flex'}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <span style={{fontWeight:700,fontSize:'0.95rem'}}>ReFizz</span>
+            <button onClick={submitRepost} disabled={reposting} style={{background:'#a78bfa',color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:'0.88rem'}}>{reposting?'…':'Post'}</button>
+          </div>
+          {/* body */}
+          <div style={{flex:1,overflowY:'auto' as const,padding:'14px 16px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
+              <div style={{width:'38px',height:'38px',borderRadius:'50%',overflow:'hidden',background:avColor(profile.id)}}>
+                <img src={avImg(profile.id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              </div>
               <div style={{display:'flex',alignItems:'center',gap:'6px',background:C.surface,borderRadius:'20px',padding:'6px 12px',cursor:'pointer'}} onClick={()=>setRepostAnon(!repostAnon)}>
                 <span style={{fontWeight:600,fontSize:'0.9rem'}}>{repostAnon?'Anonymous':profile.username}</span>
                 <span style={{color:C.muted}}>▾</span>
               </div>
             </div>
-            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none' as const,color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'80px',lineHeight:'1.5',marginBottom:'16px'}} placeholder="Add caption..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
-            <div style={{border:'1px solid '+C.border,borderRadius:'14px',padding:'14px',background:C.surface}}>
-              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
-                <div style={{width:'28px',height:'28px',borderRadius:'50%',background:repostTarget.is_anon?avColor(repostTarget.user_id):(repostTarget.profiles?.avatar_color||avColor(repostTarget.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',color:'white',fontWeight:700}}>{repostTarget.is_anon?anonEmoji(repostTarget.user_id):(repostTarget.profiles?.avatar_initials||'?')}</div>
-                <span style={{fontWeight:600,fontSize:'0.88rem'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</span>
+            <textarea style={{width:'100%',background:'transparent',border:'none',resize:'none' as const,color:C.text,fontFamily:'inherit',fontSize:'1rem',outline:'none',minHeight:'60px',lineHeight:'1.5',marginBottom:'12px'}} placeholder="Add ReFizz caption..." value={repostText} onChange={e=>setRepostText(e.target.value)} autoFocus />
+            {/* quoted post */}
+            <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'12px 14px',background:C.surface}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <div style={{width:'26px',height:'26px',borderRadius:'50%',overflow:'hidden',background:avColor(repostTarget.user_id)}}>
+                  <img src={avImg(repostTarget.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                </div>
+                <span style={{fontWeight:700,fontSize:'0.85rem'}}>{repostTarget.is_anon?'Anonymous':(repostTarget.profiles?.username||'User')}</span>
                 <span style={{fontSize:'0.75rem',color:C.muted}}>{ago(repostTarget.created_at)}</span>
               </div>
               {repostIsComment&&repostOriginalPostText&&(
@@ -1323,11 +1377,11 @@ export default function App() {
                   @Commenting on '{repostOriginalPostText.slice(0,40)}{repostOriginalPostText.length>40?'…':''}'
                 </div>
               )}
-              <div style={{fontSize:'0.92rem'}}>{repostTarget.text}</div>
+              <div style={{fontSize:'0.92rem',color:C.text,lineHeight:'1.5'}}>{repostTarget.text}</div>
             </div>
           </div>
         </div>
-      )}
+      </>)}
 
       {showDm&&dmTarget&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:500,display:'flex',flexDirection:'column' as const,justifyContent:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowDm(false)}>
