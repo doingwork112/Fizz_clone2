@@ -163,7 +163,14 @@ export default function App() {
   const [msgPullY, setMsgPullY] = useState(0)
   const [msgRefreshing, setMsgRefreshing] = useState(false)
   const msgPullYRef = useRef(0)
+  const [msgTab, setMsgTab] = useState<'posts'|'market'>('posts')
+  const [mktConvoPartners, setMktConvoPartners] = useState<string[]>(()=>{
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('heha_mkt_convos')||'[]') } catch { return [] }
+  })
 
+  const mktMyViewRef = useRef<HTMLDivElement>(null)
+  const mktMyViewOpenRef = useRef<null|'saved'|'mine'>(null)
   const [showSettings, setShowSettings] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
 
@@ -611,6 +618,7 @@ export default function App() {
   selectedListingRef.current = selectedListing
   listingPhotoIdxRef.current = listingPhotoIdx
   msgPullYRef.current = msgPullY
+  mktMyViewOpenRef.current = mktMyView
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -658,6 +666,18 @@ export default function App() {
         }
         return
       }
+      // My Saved / My Listings overlay: swipe-back
+      if (mktMyViewOpenRef.current && mktMyViewRef.current) {
+        if (dx > 8) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0) {
+          if (e.cancelable) e.preventDefault()
+          swipeXRef.current = dx
+          mktMyViewRef.current.style.animation = 'none'
+          mktMyViewRef.current.style.transition = 'none'
+          mktMyViewRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+        }
+        return
+      }
       // Listing detail open: swipe-back (right) or photo swipe (left)
       if (selectedListingRef.current) {
         const imgs = (selectedListingRef.current as any).images || []
@@ -679,10 +699,15 @@ export default function App() {
         return
       }
       if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages') return
-      if (pageRef.current === 'market' || pageRef.current === 'messages') {
-        // market/messages page: only vertical pull handled above, no horizontal swipe
-        return
+      // Vertical pull-to-refresh — runs for feed, market AND messages
+      if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
+        if (e.cancelable) e.preventDefault()
+        if (pageRef.current === 'market') setMktPullY(Math.min(dy * 0.45, 72))
+        else if (pageRef.current === 'messages') setMsgPullY(Math.min(dy * 0.45, 72))
+        else setPullY(Math.min(dy * 0.45, 72))
       }
+      if (pageRef.current === 'market' || pageRef.current === 'messages') return
+      // Feed horizontal tab swipe
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
         swipeXRef.current = dx
@@ -699,12 +724,6 @@ export default function App() {
           feedBodyRef.current.style.transition = 'none'
           feedBodyRef.current.style.transform = `translateX(${dx}px)`
         }
-      }
-      if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
-        if (e.cancelable) e.preventDefault()
-        if (pageRef.current === 'market') setMktPullY(Math.min(dy * 0.45, 72))
-        else if (pageRef.current === 'messages') setMsgPullY(Math.min(dy * 0.45, 72))
-        else setPullY(Math.min(dy * 0.45, 72))
       }
     }
     async function onTE() {
@@ -751,6 +770,21 @@ export default function App() {
         swipeLocked.current = null
         swipeXRef.current = 0
         return
+      }
+      // My Saved / My Listings: complete swipe-back or snap back
+      if (mktMyViewOpenRef.current && mktMyViewRef.current) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          mktMyViewRef.current.style.animation = 'none'
+          mktMyViewRef.current.style.transition = 'transform 0.28s ease'
+          mktMyViewRef.current.style.transform = 'translateX(100%)'
+          setTimeout(() => setMktMyView(null), 290)
+        } else {
+          mktMyViewRef.current.style.animation = 'none'
+          mktMyViewRef.current.style.transition = 'transform 0.25s ease'
+          mktMyViewRef.current.style.transform = 'translateX(0)'
+          setTimeout(() => { if (mktMyViewRef.current) mktMyViewRef.current.style.transition = '' }, 260)
+        }
+        swipeLocked.current = null; swipeXRef.current = 0; return
       }
       // Listing detail: swipe-back, photo navigation, or snap back
       if (selectedListingRef.current) {
@@ -1098,17 +1132,19 @@ export default function App() {
           <div className={msgRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:msgRefreshing?undefined:`rotate(${msgPullY*4}deg)`,transition:msgRefreshing?'none':'transform 0.1s'}}/>
         </div>
         <div style={{display:'flex',borderBottom:`1px solid ${C.border}`}}>
-          <div style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:700,borderBottom:`2px solid ${C.text}`,cursor:'pointer'}}>Posts</div>
-          <div style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:400,color:C.muted,borderBottom:'2px solid transparent',cursor:'pointer'}}>Marketplace</div>
+          <div onClick={()=>setMsgTab('posts')} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:msgTab==='posts'?700:400,color:msgTab==='posts'?C.text:C.muted,borderBottom:msgTab==='posts'?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer'}}>Posts</div>
+          <div onClick={()=>setMsgTab('market')} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:msgTab==='market'?700:400,color:msgTab==='market'?C.text:C.muted,borderBottom:msgTab==='market'?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer'}}>Marketplace</div>
         </div>
-        {convos.length===0 ? (
-          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 20px',gap:'16px',color:C.muted}}>
-            <div style={{fontSize:'3.5rem'}}>✈️</div>
-            <div style={{fontWeight:700,fontSize:'1.1rem',color:C.text}}>No messages yet.</div>
-            <div style={{fontSize:'0.9rem',textAlign:'center',lineHeight:'1.5'}}>Start a conversation. Messages you send or receive will appear here.</div>
-          </div>
-        ) : convos.map(({user:u,lastMsg})=>(
-          <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
+        {(()=>{
+          const filtered = convos.filter(({user:u})=>msgTab==='market'?mktConvoPartners.includes(u.id):!mktConvoPartners.includes(u.id))
+          return filtered.length===0 ? (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 20px',gap:'16px',color:C.muted}}>
+              <div style={{fontSize:'3.5rem'}}>{msgTab==='market'?'🛒':'✈️'}</div>
+              <div style={{fontWeight:700,fontSize:'1.1rem',color:C.text}}>{msgTab==='market'?'No marketplace messages.':'No messages yet.'}</div>
+              <div style={{fontSize:'0.9rem',textAlign:'center',lineHeight:'1.5'}}>{msgTab==='market'?'Messages with sellers will appear here.':'Start a conversation. Messages you send or receive will appear here.'}</div>
+            </div>
+          ) : filtered.map(({user:u,lastMsg})=>(
+            <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
             <img src={avImg(u.id)} alt="" style={{width:'46px',height:'46px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
@@ -1116,7 +1152,8 @@ export default function App() {
             </div>
             {lastMsg&&<div style={{fontSize:'0.75rem',color:C.muted,flexShrink:0}}>{ago(lastMsg.created_at)}</div>}
           </div>
-        ))}
+          ))
+        })()}
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
         {chatTarget&&(
           <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column'}}>
@@ -1301,7 +1338,7 @@ export default function App() {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill={savedListings.includes(selectedListing.id)?C.text:'none'} stroke={C.text} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
                   {savedListings.includes(selectedListing.id)?'Saved':'Save for later'}
                 </button>
-                <button onClick={()=>{ if(selectedListing.profiles){setPage('messages'); setTimeout(()=>openChat(selectedListing.profiles as Profile),60)} }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:'#6C2BD9',color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
+                <button onClick={()=>{ if(selectedListing.profiles){ const pid=(selectedListing.profiles as any).id||selectedListing.user_id; setMktConvoPartners(p=>{const n=p.includes(pid)?p:[...p,pid];localStorage.setItem('heha_mkt_convos',JSON.stringify(n));return n}); setSelectedListing(null); setPage('messages'); setMsgTab('market'); setTimeout(()=>openChat(selectedListing.profiles as Profile),60)} }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:'#6C2BD9',color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   Message Seller
                 </button>
@@ -1347,7 +1384,7 @@ export default function App() {
 
         {/* ─── MY SAVED / MY LISTINGS OVERLAY ─── */}
         {mktMyView&&(
-          <div className="slide-in-right" style={{position:'fixed',inset:0,zIndex:450,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+          <div ref={mktMyViewRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:450,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:10}}>
               <button onClick={()=>setMktMyView(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
               <span style={{fontWeight:800,fontSize:'1.05rem',color:C.text}}>{mktMyView==='saved'?'My Saved':'My Listings'}</span>
