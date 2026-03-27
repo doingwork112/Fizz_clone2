@@ -116,6 +116,9 @@ export default function App() {
   const touchStartX = useRef(0)
   const [postDragY, setPostDragY] = useState(0)
   const [postClosing, setPostClosing] = useState(false)
+  const [detailClosing, setDetailClosing] = useState(false)
+  const selectedPostRef = useRef<any>(null)
+  const postDetailRef = useRef<HTMLDivElement>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -480,6 +483,13 @@ export default function App() {
     setPostDragY(0)
     setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]); setPostTag(''); setShowTagPicker(false) }, 350)
   }
+  function closeDetail() {
+    if (postDetailRef.current) {
+      postDetailRef.current.style.transition = 'transform 0.28s ease'
+      postDetailRef.current.style.transform = 'translateX(100%)'
+    }
+    setTimeout(() => setSelectedPost(null), 290)
+  }
 
     const FEED_TABS = ['Top',"Fizzin'",'New'] as const
   const POST_TAGS = [
@@ -512,6 +522,7 @@ export default function App() {
   feedTabRef.current = feedTab
   pageRef.current = page
   pullYRef.current = pullY
+  selectedPostRef.current = selectedPost
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -521,12 +532,24 @@ export default function App() {
       swipeLocked.current = null
     }
     function onTM(e: TouchEvent) {
-      if (pageRef.current !== 'feed') return
       const dx = e.touches[0].clientX - sx
       const dy = e.touches[0].clientY - sy
       if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
         swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
       }
+      // Post detail open: handle right swipe to go back; let vertical scroll pass through
+      if (selectedPostRef.current) {
+        if (swipeLocked.current === 'h' && dx > 0 && e.cancelable) {
+          e.preventDefault()
+          swipeXRef.current = dx
+          if (postDetailRef.current) {
+            postDetailRef.current.style.transition = 'none'
+            postDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          }
+        }
+        return
+      }
+      if (pageRef.current !== 'feed') return
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
         swipeXRef.current = dx
@@ -544,6 +567,23 @@ export default function App() {
       }
     }
     async function onTE() {
+      // Post detail: complete swipe-back or snap back
+      if (selectedPostRef.current) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          if (postDetailRef.current) {
+            postDetailRef.current.style.transition = 'transform 0.25s ease'
+            postDetailRef.current.style.transform = 'translateX(100%)'
+          }
+          setTimeout(() => setSelectedPost(null), 260)
+        } else if (postDetailRef.current) {
+          postDetailRef.current.style.transition = 'transform 0.25s ease'
+          postDetailRef.current.style.transform = 'translateX(0)'
+          setTimeout(() => { if (postDetailRef.current) postDetailRef.current.style.transition = '' }, 260)
+        }
+        swipeLocked.current = null
+        swipeXRef.current = 0
+        return
+      }
       if (pageRef.current !== 'feed') return
       // Reset indicator transition
       if (indicatorRef.current) indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
@@ -585,8 +625,10 @@ export default function App() {
 
     return (
       <div style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg }}>
-        {/* avatar */}
-        <img src={avImg(p.user_id)} alt="" style={{ width:'44px', height:'44px', borderRadius:'50%', objectFit:'cover', flexShrink:0 }} />
+        {/* avatar — wrapper div shows bg color while img loads, preventing flash */}
+        <div style={{width:'44px',height:'44px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
+          <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+        </div>
         {/* main */}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px',flexWrap:'wrap'}}>
@@ -642,9 +684,11 @@ export default function App() {
             <div style={{marginTop:'12px',paddingTop:'12px',borderTop:`1px solid ${C.border}`}}>
               {openCmts[p.id].map(c=>(
                 <div key={c.id} style={{display:'flex',gap:'8px',marginBottom:'10px'}}>
-                  <div style={{width:'26px',height:'26px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
+                  <div style={{width:'26px',height:'26px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(c.user_id)}}>
+                    <img src={avImg(c.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  </div>
                   <div>
-                    <span style={{fontWeight:700,fontSize:'0.82rem',color:C.text}}>{c.profiles?.username||'用户'} </span>
+                    <span style={{fontWeight:700,fontSize:'0.82rem',color:C.text}}>Anonymous </span>
                     <span style={{fontSize:'0.72rem',color:C.muted}}>{ago(c.created_at)}</span>
                     <div style={{fontSize:'0.88rem',color:C.text}}>{c.text}</div>
                   </div>
@@ -1134,16 +1178,16 @@ export default function App() {
       )}
 
       {selectedPost&&(
-        <div style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column' as const}}>
+        <div ref={postDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column' as const}}>
           <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky' as const,top:0,background:C.bg}}>
-            <button onClick={()=>setSelectedPost(null)} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
+            <button onClick={closeDetail} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
             <span style={{fontWeight:700}}>Post</span>
           </div>
           <div style={{flex:1,overflowY:'auto' as const}}>
             <div style={{padding:'16px',borderBottom:'1px solid '+C.border}}>
               <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
-                <div style={{width:'40px',height:'40px',borderRadius:'50%',background:selectedPost.is_anon?avColor(selectedPost.user_id):(selectedPost.profiles?.avatar_color||avColor(selectedPost.user_id)),display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
-                  {selectedPost.is_anon?anonEmoji(selectedPost.user_id):(selectedPost.profiles?.avatar_initials||'?')}
+                <div style={{width:'40px',height:'40px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(selectedPost.user_id)}}>
+                  <img src={avImg(selectedPost.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 </div>
                 <div>
                   <div style={{fontWeight:600}}>{selectedPost.is_anon?'Anonymous':(selectedPost.profiles?.username||'User')}</div>
@@ -1187,13 +1231,15 @@ export default function App() {
                   {isReply&&parentCmt&&(
                     <div style={{fontSize:'0.75rem',color:C.muted,marginBottom:'4px',display:'flex',alignItems:'center',gap:'4px'}}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
-                      replying to {parentCmt.profiles?.username||'User'}
+                      replying to Anonymous
                     </div>
                   )}
                   <div style={{display:'flex',gap:'10px'}}>
-                    <div style={{width:'32px',height:'32px',borderRadius:'50%',background:c.profiles?.avatar_color||'#888',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.78rem',fontWeight:700,color:'white',flexShrink:0}}>{c.profiles?.avatar_initials||'?'}</div>
+                    <div style={{width:'32px',height:'32px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(c.user_id)}}>
+                      <img src={avImg(c.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontWeight:700,fontSize:'0.88rem'}}>{c.profiles?.username||'User'} <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
+                      <div style={{fontWeight:700,fontSize:'0.88rem'}}>Anonymous <span style={{color:C.muted,fontWeight:400,fontSize:'0.75rem'}}>{ago(c.created_at)}</span></div>
                       <div style={{fontSize:'0.92rem',margin:'4px 0'}}>{c.text}</div>
                       {c.images&&c.images.length>0&&(
                         <div style={{display:'grid',gridTemplateColumns:c.images.length===1?'1fr':'1fr 1fr',gap:'3px',borderRadius:'8px',overflow:'hidden',marginBottom:'6px',maxWidth:'260px'}}>
@@ -1230,7 +1276,7 @@ export default function App() {
           <div style={{borderTop:'1px solid '+C.border,background:C.bg}}>
             {replyToComment&&(
               <div style={{padding:'6px 16px 0',display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:'0.8rem',color:C.muted}}>
-                <span>↩ Replying to {replyToComment.profiles?.username||'User'}</span>
+                <span>↩ Replying to Anonymous</span>
                 <button onClick={()=>setReplyToComment(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1rem',padding:0}}>×</button>
               </div>
             )}

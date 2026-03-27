@@ -76,6 +76,18 @@ body.modal-open {
 }
 .fade-out { animation: fadeOut 0.22s ease forwards; }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.32,0.72,0,1) both; }
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+.slide-out-right { animation: slideOutRight 0.28s cubic-bezier(0.4,0,0.6,1) forwards; }
+
 .font-fizz { font-family: 'Nunito', sans-serif; }
 
 /* Tell iOS: handle vertical scroll natively, let JS handle horizontal swipe.
