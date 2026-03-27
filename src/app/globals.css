@@ -78,9 +78,11 @@ body.modal-open {
 
 .font-fizz { font-family: 'Nunito', sans-serif; }
 
-/* Tell iOS: handle vertical scroll natively, let JS handle horizontal swipe */
-.feed-swipe, .feed-swipe * {
-  touch-action: pan-y !important;
+/* Tell iOS: handle vertical scroll natively, let JS handle horizontal swipe.
+   Only set on the container, not children — so JS can still e.preventDefault()
+   vertical touches on post cards for pull-to-refresh. */
+.feed-swipe {
+  touch-action: pan-y;
 }
 
 /* Scrollbar */

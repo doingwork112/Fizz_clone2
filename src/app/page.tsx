@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import type { Profile, Post, Comment, Listing, Message } from '@/types'
 
@@ -538,7 +538,8 @@ export default function App() {
           indicatorRef.current.style.transition = 'none'
         }
       }
-      if (swipeLocked.current === 'v' && window.scrollY === 0 && dy > 0) {
+      if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
+        if (e.cancelable) e.preventDefault()
         setPullY(Math.min(dy * 0.45, 72))
       }
     }
@@ -756,7 +757,7 @@ export default function App() {
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
           <div className={refreshing ? 'spin' : ''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform: refreshing ? undefined : `rotate(${pullY*4}deg)`,transition: refreshing ? 'none' : 'transform 0.1s'}}/>
         </div>
-        {sorted().map(p=><PostCard key={p.id} p={p}/>)}
+        {sorted().map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
         {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
         <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
