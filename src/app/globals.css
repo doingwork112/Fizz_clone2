@@ -59,10 +59,10 @@ body {
 .slide-up { animation: slideUp 0.32s cubic-bezier(0.32,0.72,0,1) forwards; }
 
 @keyframes slideDown {
-  from { transform: translateY(0); }
-  to   { transform: translateY(110%); }
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0.8; }
 }
-.slide-down { animation: slideDown 0.28s cubic-bezier(0.32,0.72,0,1) forwards; }
+.slide-down { animation: slideDown 0.35s cubic-bezier(0.4,0,0.6,1) forwards; }
 
 @keyframes fadeIn {
   from { opacity: 0; }

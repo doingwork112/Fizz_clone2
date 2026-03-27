@@ -450,49 +450,60 @@ export default function App() {
   const sheet: React.CSSProperties = { background:C.bg, borderRadius:'20px 20px 0 0', padding:'20px 16px', maxHeight:'92vh', overflowY:'auto' }
 
   function closePost() {
-    setPostDragY(0)
     setPostClosing(true)
-    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]) }, 260)
+    setPostDragY(0)
+    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]) }, 350)
   }
 
   const FEED_TABS = ['Top',"Fizzin'",'New'] as const
 
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartY.current = e.touches[0].clientY
-    touchStartX.current = e.touches[0].clientX
-  }
-  function handleTouchMove(e: React.TouchEvent) {
-    if (page !== 'feed') return
-    const dy = e.touches[0].clientY - touchStartY.current
-    const dx = e.touches[0].clientX - touchStartX.current
-    // pull-to-refresh: only when at top and pulling down more than sideways
-    if (window.scrollY === 0 && dy > 0 && Math.abs(dy) > Math.abs(dx)) {
-      setPullY(Math.min(dy * 0.45, 72))
+  // Use document-level touch listeners so swipe works EVERYWHERE (on posts, buttons, etc.)
+  const swipeDx = useRef(0)
+  const swipeDy = useRef(0)
+  useEffect(() => {
+    function onTS(e: TouchEvent) {
+      touchStartY.current = e.touches[0].clientY
+      touchStartX.current = e.touches[0].clientX
+      swipeDx.current = 0
+      swipeDy.current = 0
     }
-    // track horizontal swipe for tab indicator
-    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
-      setSwipeX(dx)
+    function onTM(e: TouchEvent) {
+      if (page !== 'feed') return
+      const dy = e.touches[0].clientY - touchStartY.current
+      const dx = e.touches[0].clientX - touchStartX.current
+      swipeDx.current = dx
+      swipeDy.current = dy
+      if (window.scrollY === 0 && dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+        setPullY(Math.min(dy * 0.45, 72))
+      }
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        setSwipeX(dx)
+      }
     }
-  }
-  async function handleTouchEnd(e: React.TouchEvent) {
-    const dy = e.changedTouches[0].clientY - touchStartY.current
-    const dx = e.changedTouches[0].clientX - touchStartX.current
-    setSwipeX(0)
-    // pull-to-refresh
-    if (page === 'feed' && pullY > 52) {
-      setRefreshing(true); setPullY(0)
-      await loadPosts()
-      setRefreshing(false)
-    } else {
-      setPullY(0)
+    async function onTE() {
+      const dx = swipeDx.current
+      const dy = swipeDy.current
+      setSwipeX(0)
+      if (page === 'feed' && pullY > 52) {
+        setRefreshing(true); setPullY(0)
+        await loadPosts()
+        setRefreshing(false)
+      } else { setPullY(0) }
+      if (page === 'feed' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        const idx = FEED_TABS.indexOf(feedTab as any)
+        if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
+        if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
+      }
     }
-    // swipe between tabs (horizontal, more horizontal than vertical)
-    if (page === 'feed' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      const idx = FEED_TABS.indexOf(feedTab as any)
-      if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
-      if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
+    document.addEventListener('touchstart', onTS, { passive: true })
+    document.addEventListener('touchmove', onTM, { passive: true })
+    document.addEventListener('touchend', onTE, { passive: true })
+    return () => {
+      document.removeEventListener('touchstart', onTS)
+      document.removeEventListener('touchmove', onTM)
+      document.removeEventListener('touchend', onTE)
     }
-  }
+  }, [page, feedTab, pullY])
 
   // ── Post Card ──
   function PostCard({ p }: { p: Post }) {
@@ -527,24 +538,26 @@ export default function App() {
             </div>
           )}
           {/* action row — matches Fizz: DM, Comment, Repost, Share, ••• */}
-          <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px',color:C.muted}}>
-            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          {(() => { const ic = resolved==='light'?'#555':'#aaa'; return (
+          <div style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px'}}>
+            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
-            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.88rem',fontWeight:600,padding:0,fontFamily:'inherit'}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:ic,cursor:'pointer',fontSize:'0.88rem',fontWeight:700,padding:0,fontFamily:'inherit'}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
               {p.comments_count||''}
             </button>
-            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:'0.88rem',fontWeight:600,padding:0,fontFamily:'inherit'}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:ic,cursor:'pointer',fontSize:'0.88rem',fontWeight:700,padding:0,fontFamily:'inherit'}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
               {(p as any).reposts_count||''}
             </button>
-            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             </button>
-            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:C.muted,cursor:'pointer',padding:0,fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
+            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0,fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
             {p.user_id===profile!.id && <button onClick={()=>deletePst(p.id)} style={{background:'none',border:'none',color:C.red,cursor:'pointer',fontSize:'0.82rem',fontWeight:700,padding:0,marginLeft:'auto',fontFamily:'inherit'}}>删除</button>}
           </div>
+          )})()}
           {/* comments */}
           {cmtsOpen && (
             <div style={{marginTop:'12px',paddingTop:'12px',borderTop:`1px solid ${C.border}`}}>
@@ -635,10 +648,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:600,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em'}}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:600,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
     >
 
       {/* ─── FEED ─── */}
@@ -668,9 +678,7 @@ export default function App() {
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
           <div className={refreshing ? 'spin' : ''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform: refreshing ? undefined : `rotate(${pullY*4}deg)`,transition: refreshing ? 'none' : 'transform 0.1s'}}/>
         </div>
-        <div style={{touchAction:'pan-y'}}>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
-        </div>
         {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
         <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
@@ -864,15 +872,15 @@ export default function App() {
       </>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'max(env(safe-area-inset-bottom), 16px)'}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'env(safe-area-inset-bottom, 0px)'}}>
         {[
-          {id:'feed',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
-          {id:'messages',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
-          {id:'search',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
-          {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
-          {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
+          {id:'feed',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
+          {id:'messages',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
+          {id:'search',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
+          {id:'market',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
+          {id:'profile',icon:(a:boolean)=><svg width="25" height="25" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.6:2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 6px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'14px 0 10px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
@@ -881,16 +889,16 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ─── POST MODAL (Fizz-style bottom sheet with visible background) ─── */}
+      {/* ─── POST MODAL ─── */}
       {showPost && (<>
-        {/* semi-transparent overlay — shows previous page behind */}
-        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.35)'}}/>
-        {/* sheet — sits on top, swipe down to close, touch locked (no overscroll) */}
+        {/* overlay — shows feed behind */}
+        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:resolved==='light'?'rgba(120,120,120,0.3)':'rgba(0,0,0,0.5)'}}/>
+        {/* sheet — fixed position, swipe down to dismiss smoothly */}
         <div
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',top:'10vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)',overflow:'hidden',touchAction:'none'}}
+          style={{position:'fixed',top:'8vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',overflowY:'hidden'}}
           onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
-          onTouchMove={e=>{e.preventDefault();const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
+          onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0){e.preventDefault();setPostDragY(dy)}}}
           onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
         >
             {/* drag handle */}
