@@ -105,6 +105,9 @@ export default function App() {
   const [pullY, setPullY] = useState(0)
   const touchStartY = useRef(0)
   const touchStartX = useRef(0)
+  const [postDragY, setPostDragY] = useState(0)
+  const [postClosing, setPostClosing] = useState(false)
+  const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
 
@@ -445,6 +448,12 @@ export default function App() {
   const overlay: React.CSSProperties = { position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:300, display:'flex', flexDirection:'column', justifyContent:'flex-end' }
   const sheet: React.CSSProperties = { background:C.bg, borderRadius:'20px 20px 0 0', padding:'20px 16px', maxHeight:'92vh', overflowY:'auto' }
 
+  function closePost() {
+    setPostDragY(0)
+    setPostClosing(true)
+    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]) }, 260)
+  }
+
   const FEED_TABS = ['Top',"Fizzin'",'New'] as const
 
   function handleTouchStart(e: React.TouchEvent) {
@@ -635,12 +644,14 @@ export default function App() {
             <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',padding:0}}>⚙️</button>
           </div>
         )}
-        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'sticky',top:'53px',zIndex:99}}>
+        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'sticky',top:'53px',zIndex:99,position:'relative' as any}}>
           {(['Top',"Fizzin'",'New'] as const).map(t=>(
-            <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?700:400,color:feedTab===t?C.text:C.muted,borderBottom:feedTab===t?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer',transition:'all .15s'}}>
+            <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?700:400,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
               {t}
             </div>
           ))}
+          {/* sliding indicator */}
+          <div style={{position:'absolute',bottom:0,height:'2px',width:'33.333%',background:C.text,left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
         </div>
         {/* pull-to-refresh indicator */}
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
@@ -848,7 +859,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0 14px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>setPage(n.id as any)} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px 0 18px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
@@ -857,34 +868,55 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ─── POST MODAL ─── */}
+      {/* ─── POST MODAL (Fizz-style full-screen) ─── */}
       {showPost && (
-        <div style={overlay} onClick={e=>e.target===e.currentTarget&&setShowPost(false)}>
-          <div style={sheet}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
-              <button onClick={()=>setShowPost(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontSize:'0.95rem',fontFamily:'inherit'}}>取消</button>
-              <div style={{fontWeight:700}}>New Post</div>
-              <button onClick={submitPost} disabled={posting||!postText.trim()} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',opacity:(!postText.trim()||posting)?.5:1,fontFamily:'inherit'}}>
-                {posting?'…':'Post'}
-              </button>
-            </div>
-            <div style={{display:'flex',gap:'12px',marginBottom:'16px'}}>
-              <div style={{width:'40px',height:'40px',borderRadius:'50%',background:postAnon?avColor(profile.id):profile.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',color:'white',fontWeight:700,flexShrink:0}}>
-                {postAnon?anonEmoji(profile.id):profile.avatar_initials}
-              </div>
-              <textarea style={{...inp,minHeight:'100px',resize:'none',border:'none',background:'transparent',padding:0,fontSize:'1rem',lineHeight:'1.5'}} placeholder="What's on your mind?" value={postText} onChange={e=>setPostText(e.target.value)} autoFocus />
-            </div>
-            {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',marginBottom:'12px',borderRadius:'12px',overflow:'hidden'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'120px',objectFit:'cover'}}/>)}</div>}
-            <div style={{display:'flex',alignItems:'center',paddingTop:'12px',borderTop:`1px solid ${C.border}`}}>
-              <label style={{cursor:'pointer',color:C.accentBright,display:'flex',alignItems:'center'}}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
-                <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
-              </label>
-              <label style={{display:'flex',alignItems:'center',gap:'7px',cursor:'pointer',fontSize:'0.9rem',fontWeight:600,color:postAnon?C.accentBright:C.muted}}>
-                <input type="checkbox" checked={postAnon} onChange={e=>setPostAnon(e.target.checked)} style={{accentColor:C.accentBright,width:'16px',height:'16px',cursor:'pointer'}} />
-                匿名发布
-              </label>
-            </div>
+        <div
+          className={postClosing ? 'slide-down' : 'slide-up'}
+          style={{position:'fixed',inset:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)'}}
+        >
+          {/* drag handle */}
+          <div
+            style={{display:'flex',justifyContent:'center',padding:'10px 0 4px',cursor:'grab',flexShrink:0}}
+            onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
+            onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
+            onTouchEnd={()=>{ if(postDragY>110) closePost(); else setPostDragY(0) }}
+          >
+            <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
+          </div>
+          {/* header */}
+          <div style={{display:'flex',alignItems:'center',padding:'8px 16px 12px',flexShrink:0}}>
+            <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'4px',marginRight:'auto'}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0)} style={{background:postAnon?C.accentBright:'#6b7280',color:'white',border:'none',borderRadius:'20px',padding:'8px 22px',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0)||posting?.5:1,fontFamily:'inherit',transition:'background 0.2s'}}>
+              {posting?'…':'Post'}
+            </button>
+          </div>
+          {/* author row */}
+          <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'0 16px 14px',flexShrink:0}}>
+            <img src={avImg(profile.id)} alt="" style={{width:'42px',height:'42px',borderRadius:'50%',objectFit:'cover'}}/>
+            <button onClick={()=>setPostAnon(a=>!a)} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',fontWeight:700,fontSize:'0.95rem',color:C.text,fontFamily:'inherit',padding:0}}>
+              {postAnon ? 'Anonymous' : profile.username}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          {/* text area */}
+          <div style={{flex:1,padding:'0 16px 12px',overflowY:'auto'}}>
+            <textarea
+              style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1.05rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'120px'}}
+              placeholder="Share what's really on your mind..."
+              value={postText}
+              onChange={e=>setPostText(e.target.value)}
+              autoFocus
+            />
+            {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'130px',objectFit:'cover'}}/>)}</div>}
+          </div>
+          {/* bottom toolbar */}
+          <div style={{display:'flex',alignItems:'center',gap:'16px',padding:'12px 16px',borderTop:`1px solid ${C.border}`,paddingBottom:`calc(12px + env(safe-area-inset-bottom))`,flexShrink:0}}>
+            <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center'}}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+              <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
+            </label>
           </div>
         </div>
       )}

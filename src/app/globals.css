@@ -40,6 +40,18 @@ body {
 }
 .spin { animation: spin 0.7s linear infinite; }
 
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.slide-up { animation: slideUp 0.32s cubic-bezier(0.32,0.72,0,1) forwards; }
+
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to   { transform: translateY(110%); }
+}
+.slide-down { animation: slideDown 0.28s cubic-bezier(0.32,0.72,0,1) forwards; }
+
 .font-fizz { font-family: 'Nunito', sans-serif; }
 
 /* Scrollbar */
