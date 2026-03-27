@@ -106,6 +106,8 @@ export default function App() {
   const [postText, setPostText] = useState('')
   const [postAnon, setPostAnon] = useState(true)
   const [posting, setPosting] = useState(false)
+  const [postTag, setPostTag] = useState('')
+  const [showTagPicker, setShowTagPicker] = useState(false)
   const [fabExpanded, setFabExpanded] = useState(true)
   const lastScrollY = useRef(0)
   const [refreshing, setRefreshing] = useState(false)
@@ -117,7 +119,7 @@ export default function App() {
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
-  const [swipeX, setSwipeX] = useState(0)
+
 
   const [showListing, setShowListing] = useState(false)
   const [lf, setLf] = useState({ title:'', price:'', cat:'clothes', desc:'', condition:'Good' })
@@ -252,8 +254,9 @@ export default function App() {
         urls.push(u.publicUrl)
       }
     }
-    await sb.from('posts').insert({user_id:profile.id,text:postText.trim(),is_anon:postAnon,school:profile.school,images:urls})
-    setPostText('');setPostImgs([]);setPostPrevs([]);setShowPost(false);setPosting(false);loadPosts()
+    const finalText = postTag ? `${postTag}\n${postText.trim()}` : postText.trim()
+    await sb.from('posts').insert({user_id:profile.id,text:finalText,is_anon:postAnon,school:profile.school,images:urls})
+    setPostText('');setPostImgs([]);setPostPrevs([]);setPostTag('');setShowPost(false);setPosting(false);loadPosts()
   }
   function pickImgs(e){
     const files=Array.from(e.target.files||[]).slice(0,4) as File[]
@@ -475,40 +478,65 @@ export default function App() {
   function closePost() {
     setPostClosing(true)
     setPostDragY(0)
-    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]) }, 350)
+    setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]); setPostTag(''); setShowTagPicker(false) }, 350)
   }
 
-  const FEED_TABS = ['Top',"Fizzin'",'New'] as const
+    const FEED_TABS = ['Top',"Fizzin'",'New'] as const
+  const POST_TAGS = [
+    {tag:'LOST & FOUND',emoji:'❓',bg:'#fde8d0',color:'#d97706'},
+    {tag:'SHOUT OUT',emoji:'👏',bg:'#fde8d0',color:'#ea580c'},
+    {tag:'QUESTION',emoji:'❔',bg:'#dbeafe',color:'#2563eb'},
+    {tag:'FIT CHECK',emoji:'👔',bg:'#fde8d0',color:'#d97706'},
+    {tag:'LOCAL REC',emoji:'🏛',bg:'#dbeafe',color:'#2563eb'},
+    {tag:'CONFESSION',emoji:'👋',bg:'#fce7f3',color:'#db2777'},
+    {tag:'EVENT',emoji:'📅',bg:'#fce7f3',color:'#c084fc'},
+    {tag:'STORY TIME',emoji:'👥',bg:'#fef9c3',color:'#ca8a04'},
+    {tag:'PSA',emoji:'📢',bg:'#ede9fe',color:'#7c3aed'},
+    {tag:'BREAKING NEWS',emoji:'❗',bg:'#fce7f3',color:'#dc2626'},
+    {tag:'DM ME',emoji:'💬',bg:'#dbeafe',color:'#2563eb'},
+    {tag:'HOT',emoji:'🔥',bg:'#fde8d0',color:'#ea580c'},
+    {tag:'CRUSH',emoji:'❤️',bg:'#fce7f3',color:'#ec4899'},
+    {tag:'TEA',emoji:'🍵',bg:'#d1fae5',color:'#059669'},
+    {tag:'GREEN FLAG',emoji:'🟢',bg:'#d1fae5',color:'#16a34a'},
+    {tag:'RED FLAG',emoji:'🚩',bg:'#fce7f3',color:'#dc2626'},
+  ]
 
-  // Swipe — use refs to always have current values in document listeners
+  // Swipe — document listeners with refs to avoid stale closures
+  // Use refs for swipeX to avoid re-renders (which cause avatar flash)
   const swipeLocked = useRef<'h'|'v'|null>(null)
   const feedTabRef = useRef(feedTab)
   const pageRef = useRef(page)
   const pullYRef = useRef(pullY)
   const swipeXRef = useRef(0)
+  const indicatorRef = useRef<HTMLDivElement>(null)
   feedTabRef.current = feedTab
   pageRef.current = page
   pullYRef.current = pullY
 
   useEffect(() => {
-    let sx = 0, sy = 0, dx = 0, dy = 0
+    let sx = 0, sy = 0
     function onTS(e: TouchEvent) {
       sx = e.touches[0].clientX
       sy = e.touches[0].clientY
-      dx = 0; dy = 0
       swipeLocked.current = null
     }
     function onTM(e: TouchEvent) {
       if (pageRef.current !== 'feed') return
-      dx = e.touches[0].clientX - sx
-      dy = e.touches[0].clientY - sy
+      const dx = e.touches[0].clientX - sx
+      const dy = e.touches[0].clientY - sy
       if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
         swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
       }
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
         swipeXRef.current = dx
-        setSwipeX(dx)
+        // Directly move indicator via DOM — no re-render, no avatar flash
+        if (indicatorRef.current) {
+          const tabIdx = ['Top',"Fizzin'",'New'].indexOf(feedTabRef.current)
+          const pct = Math.max(0, Math.min(66.666, tabIdx * 33.333 + (-dx / window.innerWidth * 100)))
+          indicatorRef.current.style.left = pct + '%'
+          indicatorRef.current.style.transition = 'none'
+        }
       }
       if (swipeLocked.current === 'v' && window.scrollY === 0 && dy > 0) {
         setPullY(Math.min(dy * 0.45, 72))
@@ -516,7 +544,8 @@ export default function App() {
     }
     async function onTE() {
       if (pageRef.current !== 'feed') return
-      setSwipeX(0)
+      // Reset indicator transition
+      if (indicatorRef.current) indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
       if (pullYRef.current > 52) {
         setRefreshing(true); setPullY(0)
         await loadPosts()
@@ -527,6 +556,10 @@ export default function App() {
         const idx = tabs.indexOf(feedTabRef.current as any)
         if (swipeXRef.current < 0 && idx < tabs.length - 1) setFeedTab(tabs[idx + 1])
         if (swipeXRef.current > 0 && idx > 0) setFeedTab(tabs[idx - 1])
+      } else if (indicatorRef.current) {
+        // Snap back
+        const tabIdx = ['Top',"Fizzin'",'New'].indexOf(feedTabRef.current)
+        indicatorRef.current.style.left = (tabIdx * 33.333) + '%'
       }
       swipeLocked.current = null
       swipeXRef.current = 0
@@ -560,7 +593,16 @@ export default function App() {
             <span style={{color:C.muted,fontSize:'0.8rem'}}>{ago(p.created_at)}</span>
             {p.is_hot && <span style={{background:'#fef3c7',color:'#d97706',borderRadius:'4px',padding:'1px 6px',fontSize:'0.68rem',fontWeight:700}}>🔥 HOT</span>}
           </div>
-          <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{p.text}</div>
+          {(() => {
+            // Check if post starts with a known tag
+            const tagLine = p.text.split('\n')[0]
+            const matchTag = POST_TAGS.find(t => t.tag === tagLine)
+            const displayText = matchTag ? p.text.slice(tagLine.length).trim() : p.text
+            return <>
+              {matchTag && <span style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'3px 10px',borderRadius:'16px',fontSize:'0.72rem',fontWeight:800,marginBottom:'4px',background:matchTag.bg,color:matchTag.color}}>{matchTag.emoji} {matchTag.tag}</span>}
+              <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{displayText}</div>
+            </>
+          })()}
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {(p as any).repost_of&&(
             <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'14px 14px',marginTop:'10px',background:C.bg,cursor:'pointer'}} onClick={()=>openPost((p as any).repost_of)}>
@@ -688,7 +730,7 @@ export default function App() {
     >
 
       {/* ─── FEED ─── */}
-      {page==='feed' && <div>
+      {page==='feed' && <div className="feed-swipe">
         {topBar(
           <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>{profile.school}</span></>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
@@ -706,8 +748,8 @@ export default function App() {
                 {t}
               </div>
             ))}
-            {/* sliding indicator — follows finger exactly */}
-            <div style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${Math.max(0,Math.min(66.666,((['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333)+(-swipeX/(typeof window!=='undefined'?window.innerWidth:375)*100)))}%`,transition:swipeX===0?'left 0.25s cubic-bezier(0.4,0,0.2,1)':'none'}}/>
+            {/* sliding indicator — follows finger via ref, no re-render */}
+            <div ref={indicatorRef} style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
           </div>
         </div>
         {/* pull-to-refresh indicator */}
@@ -925,23 +967,19 @@ export default function App() {
         ))}
       </nav>
 
-      {/* ─── POST MODAL — bottom sheet, keyboard pushes it up ─── */}
+      {/* ─── POST MODAL — bottom sheet ─── */}
       {showPost && (<>
-        {/* semi-transparent overlay — shows feed behind */}
         <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.3)'}}/>
-        {/* bottom sheet — sits above keyboard */}
         <div
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:'55vh',display:'flex',flexDirection:'column',boxShadow:'0 -4px 30px rgba(0,0,0,0.15)'}}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.35s cubic-bezier(0.32,0.72,0,1)',maxHeight:showTagPicker?'80vh':'55vh',display:'flex',flexDirection:'column',boxShadow:'0 -4px 30px rgba(0,0,0,0.15)'}}
           onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
           onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0)setPostDragY(dy)}}
           onTouchEnd={()=>{ if(postDragY>80) closePost(); else setPostDragY(0) }}
         >
-            {/* drag handle */}
             <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}>
               <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
             </div>
-            {/* close + author row */}
             <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px 8px',flexShrink:0}}>
               <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'2px',display:'flex'}}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -952,20 +990,40 @@ export default function App() {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
             </div>
-            {/* text area — this part scrolls */}
-            <div style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px'}}>
-              <textarea
-                style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'80px'}}
-                placeholder="Share what's really on your mind..."
-                value={postText}
-                onChange={e=>setPostText(e.target.value)}
-                autoFocus
-              />
-              {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden',marginBottom:'8px'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'100px',objectFit:'cover'}}/>)}</div>}
-            </div>
-            {/* toolbar — fixed at bottom of sheet, above keyboard */}
+            {/* selected tag badge */}
+            {postTag && (
+              <div style={{padding:'0 16px 6px',flexShrink:0}}>
+                <span onClick={()=>{setPostTag('');setShowTagPicker(false)}} style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'4px 12px',borderRadius:'20px',fontSize:'0.78rem',fontWeight:800,cursor:'pointer',background:POST_TAGS.find(t=>t.tag===postTag)?.bg||'#f0f0f0',color:POST_TAGS.find(t=>t.tag===postTag)?.color||'#333'}}>
+                  {POST_TAGS.find(t=>t.tag===postTag)?.emoji} {postTag} ✕
+                </span>
+              </div>
+            )}
+            {/* tag picker or text area */}
+            {showTagPicker ? (
+              <div style={{flex:1,padding:'8px 16px',overflowY:'auto'}}>
+                <div style={{display:'flex',flexWrap:'wrap',gap:'10px'}}>
+                  {POST_TAGS.map(t=>(
+                    <button key={t.tag} onClick={()=>{setPostTag(t.tag);setShowTagPicker(false)}} style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'10px 18px',borderRadius:'24px',fontSize:'0.85rem',fontWeight:800,border:'none',cursor:'pointer',background:t.bg,color:t.color,fontFamily:'inherit'}}>
+                      {t.emoji} {t.tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px'}}>
+                <textarea
+                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'80px'}}
+                  placeholder="Share what's really on your mind..."
+                  value={postText}
+                  onChange={e=>setPostText(e.target.value)}
+                  autoFocus
+                />
+                {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden',marginBottom:'8px'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'100px',objectFit:'cover'}}/>)}</div>}
+              </div>
+            )}
+            {/* toolbar */}
             <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0,background:C.bg}}>
-              <button style={{display:'flex',alignItems:'center',gap:'4px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:'20px',padding:'5px 10px',fontSize:'0.8rem',fontWeight:700,color:C.text,cursor:'pointer',fontFamily:'inherit'}}>+ Tag</button>
+              <button onClick={()=>setShowTagPicker(v=>!v)} style={{display:'flex',alignItems:'center',gap:'4px',background:showTagPicker?C.accentBright:C.surface,border:`1px solid ${showTagPicker?C.accentBright:C.border}`,borderRadius:'20px',padding:'5px 10px',fontSize:'0.8rem',fontWeight:700,color:showTagPicker?'white':C.text,cursor:'pointer',fontFamily:'inherit'}}>+ Tag</button>
               <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',padding:'5px'}}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
                 <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
@@ -978,7 +1036,7 @@ export default function App() {
               <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',color:C.muted}}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
               </button>
-              <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0)} style={{marginLeft:'auto',background:'#a78bfa',color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,fontSize:'0.88rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0)||posting?.5:1,fontFamily:'inherit'}}>
+              <button onClick={submitPost} disabled={posting||(!postText.trim()&&postImgs.length===0&&!postTag)} style={{marginLeft:'auto',background:'#a78bfa',color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,fontSize:'0.88rem',cursor:'pointer',opacity:(!postText.trim()&&postImgs.length===0&&!postTag)||posting?.5:1,fontFamily:'inherit'}}>
                 {posting?'…':'Post'}
               </button>
             </div>
@@ -1180,7 +1238,7 @@ export default function App() {
                 {cmtPrevs.map((p,i)=><img key={i} src={p} alt="" style={{height:'60px',width:'60px',objectFit:'cover',borderRadius:'8px',flexShrink:0}}/>)}
               </div>
             )}
-            <div style={{padding:'8px 16px',display:'flex',gap:'8px',alignItems:'center'}}>
+            <div style={{padding:'8px 16px',paddingBottom:`calc(8px + 34px + env(safe-area-inset-bottom, 0px))`,display:'flex',gap:'8px',alignItems:'center'}}>
               <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',flexShrink:0}}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
                 <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickCmtImgs} />
