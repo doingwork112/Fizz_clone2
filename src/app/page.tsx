@@ -153,6 +153,16 @@ export default function App() {
   const [listingView, setListingView] = useState<'cat'|'cond'|null>(null)
   const [lPreviews, setLPreviews] = useState<string[]>([])
   const [lUploading, setLUploading] = useState(false)
+  const [listingPhotoIdx, setListingPhotoIdx] = useState(0)
+  const listingPhotoIdxRef = useRef(0)
+  const [showSortSheet, setShowSortSheet] = useState(false)
+  const [showCatSheet, setShowCatSheet] = useState(false)
+  const [showCondSheet, setShowCondSheet] = useState(false)
+  const [mktSort, setMktSort] = useState<'newest'|'oldest'|'lowest'|'highest'>('newest')
+  const [mktMyView, setMktMyView] = useState<null|'saved'|'mine'>(null)
+  const [msgPullY, setMsgPullY] = useState(0)
+  const [msgRefreshing, setMsgRefreshing] = useState(false)
+  const msgPullYRef = useRef(0)
 
   const [showSettings, setShowSettings] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
@@ -478,6 +488,7 @@ export default function App() {
     loadConvos()
   }
   useEffect(()=>{ chatRef.current?.scrollTo(0,chatRef.current.scrollHeight) },[chatMsgs])
+  useEffect(() => { setListingPhotoIdx(0) }, [selectedListing?.id])
 
   // Lock body scroll on iOS — position:fixed is the only reliable method for PWA
   useEffect(()=>{
@@ -598,6 +609,8 @@ export default function App() {
   showRepostRef.current = showRepost
   chatTargetRef.current = chatTarget
   selectedListingRef.current = selectedListing
+  listingPhotoIdxRef.current = listingPhotoIdx
+  msgPullYRef.current = msgPullY
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -645,10 +658,14 @@ export default function App() {
         }
         return
       }
-      // Listing detail open: swipe-back (right)
+      // Listing detail open: swipe-back (right) or photo swipe (left)
       if (selectedListingRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
-        if (swipeLocked.current === 'h' && dx > 0) {
+        const imgs = (selectedListingRef.current as any).images || []
+        const onFirstPhoto = listingPhotoIdxRef.current === 0
+        const onLastPhoto = listingPhotoIdxRef.current >= imgs.length - 1
+        if (dx > 8 && onFirstPhoto) swipeLocked.current = 'h'
+        if (dx < -8 && !onLastPhoto) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0 && onFirstPhoto) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
           if (listingDetailRef.current) {
@@ -656,12 +673,14 @@ export default function App() {
             listingDetailRef.current.style.transition = 'none'
             listingDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
           }
+        } else if (swipeLocked.current === 'h' && dx < 0) {
+          swipeXRef.current = dx
         }
         return
       }
-      if (pageRef.current !== 'feed' && pageRef.current !== 'market') return
-      if (pageRef.current !== 'feed') {
-        // market page: only vertical pull handled above, no horizontal swipe
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages') return
+      if (pageRef.current === 'market' || pageRef.current === 'messages') {
+        // market/messages page: only vertical pull handled above, no horizontal swipe
         return
       }
       if (swipeLocked.current === 'h' && e.cancelable) {
@@ -684,6 +703,7 @@ export default function App() {
       if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
         if (e.cancelable) e.preventDefault()
         if (pageRef.current === 'market') setMktPullY(Math.min(dy * 0.45, 72))
+        else if (pageRef.current === 'messages') setMsgPullY(Math.min(dy * 0.45, 72))
         else setPullY(Math.min(dy * 0.45, 72))
       }
     }
@@ -732,39 +752,56 @@ export default function App() {
         swipeXRef.current = 0
         return
       }
-      // Listing detail: complete swipe-back or snap back
+      // Listing detail: swipe-back, photo navigation, or snap back
       if (selectedListingRef.current) {
-        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+        const imgs = (selectedListingRef.current as any).images || []
+        const onFirstPhoto = listingPhotoIdxRef.current === 0
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80 && onFirstPhoto) {
           if (listingDetailRef.current) {
             listingDetailRef.current.style.animation = 'none'
             listingDetailRef.current.style.transition = 'transform 0.28s ease'
             listingDetailRef.current.style.transform = 'translateX(100%)'
           }
           setTimeout(() => setSelectedListing(null), 290)
-        } else if (listingDetailRef.current) {
-          listingDetailRef.current.style.animation = 'none'
-          listingDetailRef.current.style.transition = 'transform 0.25s ease'
-          listingDetailRef.current.style.transform = 'translateX(0)'
-          setTimeout(() => { if (listingDetailRef.current) listingDetailRef.current.style.transition = '' }, 260)
+        } else {
+          if (swipeLocked.current === 'h' && swipeXRef.current < -40 && listingPhotoIdxRef.current < imgs.length - 1) {
+            setListingPhotoIdx(i => i + 1)
+          } else if (swipeLocked.current === 'h' && swipeXRef.current > 40 && listingPhotoIdxRef.current > 0) {
+            setListingPhotoIdx(i => i - 1)
+          }
+          if (listingDetailRef.current) {
+            listingDetailRef.current.style.animation = 'none'
+            listingDetailRef.current.style.transition = 'transform 0.25s ease'
+            listingDetailRef.current.style.transform = 'translateX(0)'
+            setTimeout(() => { if (listingDetailRef.current) listingDetailRef.current.style.transition = '' }, 260)
+          }
         }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
-      if (pageRef.current !== 'feed') return
-      // Reset indicator transition
-      if (indicatorRef.current) indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages') return
       if (pageRef.current === 'market') {
         if (mktPullYRef.current > 52) {
           setMktRefreshing(true); setMktPullY(0)
           await loadListings()
           setMktRefreshing(false)
         } else { setMktPullY(0) }
-      } else {
-        if (pullYRef.current > 52) {
-          setRefreshing(true); setPullY(0)
-          await loadPosts()
-          setRefreshing(false)
-        } else { setPullY(0) }
+        swipeLocked.current = null; swipeXRef.current = 0; return
       }
+      if (pageRef.current === 'messages') {
+        if (msgPullYRef.current > 52) {
+          setMsgRefreshing(true); setMsgPullY(0)
+          await loadConvos()
+          setMsgRefreshing(false)
+        } else { setMsgPullY(0) }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
+      // Reset indicator transition (feed only)
+      if (indicatorRef.current) indicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
+      if (pullYRef.current > 52) {
+        setRefreshing(true); setPullY(0)
+        await loadPosts()
+        setRefreshing(false)
+      } else { setPullY(0) }
       const tabs = ['Top',"Fizzin'",'New'] as const
       const idx = tabs.indexOf(feedTabRef.current as any)
       let newTab: typeof tabs[number] | null = null
@@ -998,6 +1035,11 @@ export default function App() {
     if (mktCondFilter && (l as any).condition !== mktCondFilter) return false
     if (mktSearch && !l.title.toLowerCase().includes(mktSearch.toLowerCase()) && !l.description?.toLowerCase().includes(mktSearch.toLowerCase())) return false
     return true
+  }).sort((a,b)=>{
+    if (mktSort==='oldest') return new Date(a.created_at).getTime()-new Date(b.created_at).getTime()
+    if (mktSort==='lowest') return a.price-b.price
+    if (mktSort==='highest') return b.price-a.price
+    return new Date(b.created_at).getTime()-new Date(a.created_at).getTime() // newest
   })
   const topBar = (title: React.ReactNode, right?: React.ReactNode) => (
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
@@ -1051,6 +1093,10 @@ export default function App() {
       {/* ─── MESSAGES ─── */}
       {page==='messages' && <>
         {topBar('Messages')}
+        {/* Messages pull-to-refresh indicator */}
+        <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:msgRefreshing?'52px':`${msgPullY}px`,transition:msgPullY===0?'height 0.25s ease':'none'}}>
+          <div className={msgRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:msgRefreshing?undefined:`rotate(${msgPullY*4}deg)`,transition:msgRefreshing?'none':'transform 0.1s'}}/>
+        </div>
         <div style={{display:'flex',borderBottom:`1px solid ${C.border}`}}>
           <div style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:700,borderBottom:`2px solid ${C.text}`,cursor:'pointer'}}>Posts</div>
           <div style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:400,color:C.muted,borderBottom:'2px solid transparent',cursor:'pointer'}}>Marketplace</div>
@@ -1156,26 +1202,26 @@ export default function App() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input value={mktSearch} onChange={e=>setMktSearch(e.target.value)} placeholder="Search Rice Marketplace" style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.9rem',fontFamily:'inherit'}}/>
           </div>
-          <button onClick={()=>setSavedListings([])} style={{background:'none',border:'none',cursor:'pointer',padding:'4px'}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2.2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+          <button onClick={()=>setMktMyView('saved')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill={mktMyView==='saved'?C.text:'none'} stroke={C.text} strokeWidth="2.2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
           </button>
-          <button style={{background:'none',border:'none',cursor:'pointer',padding:'4px'}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2.2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <button onClick={()=>setMktMyView('mine')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mktMyView==='mine'?C.accentBright:C.text} strokeWidth="2.2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           </button>
         </div>
         {/* Filter pills */}
         <div style={{display:'flex',gap:'8px',padding:'10px 12px',overflowX:'auto',borderBottom:`1px solid ${C.border}`,scrollbarWidth:'none'}}>
-          <button onClick={()=>{}} style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${C.border}`,background:'transparent',color:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-            Sort by <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="7 16 12 21 17 16"/><polyline points="7 8 12 3 17 8"/></svg>
+          <button onClick={()=>setShowSortSheet(true)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktSort!=='newest'?C.accentBright:C.border}`,background:mktSort!=='newest'?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktSort!=='newest'?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+            {mktSort==='newest'?'Sort by':mktSort==='oldest'?'Oldest':mktSort==='lowest'?'Lowest $':'Highest $'} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="7 16 12 21 17 16"/><polyline points="7 8 12 3 17 8"/></svg>
           </button>
           <button onClick={()=>setMktHideSold(v=>!v)} style={{flexShrink:0,padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktHideSold?C.accentBright:C.border}`,background:mktHideSold?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktHideSold?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
             Hide Sold
           </button>
-          <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCat&&mktCat!=='all'?C.accentBright:C.border}`,background:'transparent',color:mktCat&&mktCat!=='all'?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setMktCat(mktCat&&mktCat!=='all'?'all':'')}>
-            Category <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCat&&mktCat!=='all'?C.accentBright:C.border}`,background:mktCat&&mktCat!=='all'?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktCat&&mktCat!=='all'?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setShowCatSheet(true)}>
+            {mktCat&&mktCat!=='all'?mktCat:'Category'} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-          <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCondFilter?C.accentBright:C.border}`,background:'transparent',color:mktCondFilter?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setMktCondFilter(v=>v?'':'Good')}>
-            Condition <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          <button style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktCondFilter?C.accentBright:C.border}`,background:mktCondFilter?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktCondFilter?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}} onClick={()=>setShowCondSheet(true)}>
+            {mktCondFilter||'Condition'} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
         </div>
         {/* Grid */}
@@ -1216,11 +1262,25 @@ export default function App() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
               </button>
             </div>
-            {/* main image */}
-            {selectedListing.images&&selectedListing.images.length>0
-              ? <img src={selectedListing.images[0]} alt={selectedListing.title} style={{width:'100%',aspectRatio:'1',objectFit:'cover'}}/>
-              : <div style={{width:'100%',aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
-            }
+            {/* image carousel */}
+            {selectedListing.images&&selectedListing.images.length>0 ? (
+              <div style={{position:'relative',width:'100%',aspectRatio:'1',overflow:'hidden'}}>
+                <div style={{display:'flex',height:'100%',transition:'transform 0.25s cubic-bezier(0.4,0,0.2,1)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
+                  {selectedListing.images.map((img,i)=>(
+                    <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover'}}/>
+                  ))}
+                </div>
+                {selectedListing.images.length>1&&(
+                  <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
+                    {selectedListing.images.map((_,i)=>(
+                      <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{width:'100%',aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
+            )}
             {/* info */}
             <div style={{padding:'16px 18px 32px'}}>
               <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'4px'}}>
@@ -1283,6 +1343,114 @@ export default function App() {
               )}
             </div>
           </div>
+        )}
+
+        {/* ─── MY SAVED / MY LISTINGS OVERLAY ─── */}
+        {mktMyView&&(
+          <div className="slide-in-right" style={{position:'fixed',inset:0,zIndex:450,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:10}}>
+              <button onClick={()=>setMktMyView(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+              <span style={{fontWeight:800,fontSize:'1.05rem',color:C.text}}>{mktMyView==='saved'?'My Saved':'My Listings'}</span>
+            </div>
+            {(() => {
+              const items = mktMyView==='saved'
+                ? listings.filter(l=>savedListings.includes(l.id))
+                : listings.filter(l=>l.user_id===profile.id)
+              return items.length===0 ? (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}>
+                  <div style={{fontSize:'3rem',opacity:.4}}>{mktMyView==='saved'?'🔖':'🏷️'}</div>
+                  <div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>{mktMyView==='saved'?'No saved listings yet.':'No listings yet.'}</div>
+                </div>
+              ) : (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',padding:'12px'}}>
+                  {items.map(l=>(
+                    <div key={l.id} onClick={()=>{setSelectedListing(l);setMktMyView(null)}} style={{background:C.bg,borderRadius:'16px',overflow:'hidden',cursor:'pointer',border:`1px solid ${C.border}`,boxShadow:resolved==='light'?'0 2px 8px rgba(0,0,0,0.07)':'none'}}>
+                      <div style={{aspectRatio:'1',background:C.surface,position:'relative',overflow:'hidden'}}>
+                        {l.images&&l.images.length>0
+                          ? <img src={l.images[0]} alt={l.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                          : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2.5rem'}}>{l.emoji||'📦'}</div>
+                        }
+                        {l.is_sold&&<div style={{position:'absolute',top:'8px',left:'8px',background:'rgba(0,0,0,0.82)',color:'white',borderRadius:'8px',padding:'3px 10px',fontSize:'0.75rem',fontWeight:800,letterSpacing:'.5px'}}>SOLD</div>}
+                      </div>
+                      <div style={{padding:'10px 12px 12px'}}>
+                        <div style={{fontWeight:700,fontSize:'0.9rem',marginBottom:'3px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:C.text}}>{l.title}</div>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                          <span style={{fontWeight:800,fontSize:'0.97rem',color:C.text}}>${l.price}</span>
+                          <span style={{fontSize:'0.75rem',color:C.muted}}>{(l as any).condition||'Good'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* ─── SORT BOTTOM SHEET ─── */}
+        {showSortSheet&&(
+          <>
+            <div onClick={()=>setShowSortSheet(false)} style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.45)'}}/>
+            <div className="slide-up" style={{position:'fixed',left:0,right:0,bottom:0,zIndex:501,background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px 40px',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}>
+              <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border,margin:'0 auto 20px'}}/>
+              <div style={{fontWeight:800,fontSize:'1.05rem',color:C.text,marginBottom:'16px',textAlign:'center'}}>Sort by</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:'10px',justifyContent:'center'}}>
+                {([['newest','Newest First'],['oldest','Oldest First'],['lowest','Lowest Price First'],['highest','Highest Price First']] as const).map(([val,label])=>(
+                  <button key={val} onClick={()=>{setMktSort(val);setShowSortSheet(false)}} style={{padding:'12px 22px',borderRadius:'24px',border:`2px solid ${mktSort===val?C.accentBright:C.border}`,background:mktSort===val?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktSort===val?C.accentBright:C.text,fontWeight:700,fontSize:'0.97rem',cursor:'pointer',fontFamily:'inherit'}}>{label}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ─── CATEGORY BOTTOM SHEET ─── */}
+        {showCatSheet&&(
+          <>
+            <div onClick={()=>setShowCatSheet(false)} style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.45)'}}/>
+            <div className="slide-up" style={{position:'fixed',left:0,right:0,bottom:0,zIndex:501,background:C.bg,borderRadius:'20px 20px 0 0',maxHeight:'75vh',overflowY:'auto',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}>
+              <div style={{padding:'20px 16px 8px'}}>
+                <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border,margin:'0 auto 20px'}}/>
+                <div style={{fontWeight:800,fontSize:'1.05rem',color:C.text,marginBottom:'12px',textAlign:'center'}}>Category</div>
+              </div>
+              <div style={{padding:'0 12px 40px',display:'flex',flexDirection:'column',gap:'6px'}}>
+                <button onClick={()=>{setMktCat('all');setShowCatSheet(false)}} style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 16px',borderRadius:'14px',background:(!mktCat||mktCat==='all')?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):resolved==='light'?'#f5f5f7':C.surface,border:(!mktCat||mktCat==='all')?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
+                  <span style={{fontSize:'1.4rem',width:'32px',textAlign:'center'}}>🔍</span>
+                  <span style={{fontWeight:700,fontSize:'0.97rem',color:C.text,flex:1}}>All Categories</span>
+                  {(!mktCat||mktCat==='all')&&<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.accentBright} strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                </button>
+                {[{emoji:'👕',label:'Clothes'},{emoji:'👠',label:'Shoes'},{emoji:'🧢',label:'Hats'},{emoji:'💍',label:'Jewelry'},{emoji:'🕶️',label:'Accessories'},{emoji:'📚',label:'Books'},{emoji:'🎒',label:'School Gear'},{emoji:'📱',label:'Electronics'},{emoji:'🚲',label:'Bikes'},{emoji:'🏠',label:'Home Goods'},{emoji:'🪑',label:'Furniture'},{emoji:'🎟️',label:'Tickets'},{emoji:'❓',label:'Other'}].map(({emoji,label})=>(
+                  <button key={label} onClick={()=>{setMktCat(label);setShowCatSheet(false)}} style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 16px',borderRadius:'14px',background:mktCat===label?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):resolved==='light'?'#f5f5f7':C.surface,border:mktCat===label?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
+                    <span style={{fontSize:'1.4rem',width:'32px',textAlign:'center'}}>{emoji}</span>
+                    <span style={{fontWeight:700,fontSize:'0.97rem',color:C.text,flex:1}}>{label}</span>
+                    {mktCat===label&&<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.accentBright} strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ─── CONDITION BOTTOM SHEET ─── */}
+        {showCondSheet&&(
+          <>
+            <div onClick={()=>setShowCondSheet(false)} style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.45)'}}/>
+            <div className="slide-up" style={{position:'fixed',left:0,right:0,bottom:0,zIndex:501,background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px 40px',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)'}}>
+              <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border,margin:'0 auto 20px'}}/>
+              <div style={{fontWeight:800,fontSize:'1.05rem',color:C.text,marginBottom:'16px',textAlign:'center'}}>Condition</div>
+              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                <button onClick={()=>{setMktCondFilter('');setShowCondSheet(false)}} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',padding:'18px',borderRadius:'14px',background:!mktCondFilter?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):resolved==='light'?'#f5f5f7':C.surface,border:!mktCondFilter?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
+                  <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>Any Condition</span>
+                  <span style={{fontWeight:400,fontSize:'0.87rem',color:C.muted}}>Show all listings regardless of condition.</span>
+                </button>
+                {[{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
+                  <button key={label} onClick={()=>{setMktCondFilter(label);setShowCondSheet(false)}} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',padding:'18px',borderRadius:'14px',background:mktCondFilter===label?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):resolved==='light'?'#f5f5f7':C.surface,border:mktCondFilter===label?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
+                    <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>{label}</span>
+                    <span style={{fontWeight:400,fontSize:'0.87rem',color:C.muted}}>{desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
       </>}
 
