@@ -131,6 +131,7 @@ export default function App() {
   const repostDragTrack = useRef(0)
   const chatDetailRef = useRef<HTMLDivElement>(null)
   const chatTargetRef = useRef<Profile|null>(null)
+  const detailBackdropRef = useRef<HTMLDivElement>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -467,10 +468,19 @@ export default function App() {
   }
   useEffect(()=>{ chatRef.current?.scrollTo(0,chatRef.current.scrollHeight) },[chatMsgs])
 
-  // Lock body scroll when any bottom sheet is open — prevents background feed from scrolling
+  // Lock body scroll on iOS — position:fixed is the only reliable method for PWA
   useEffect(()=>{
-    document.documentElement.style.overflow = (showPost||showRepost) ? 'hidden' : ''
-    return ()=>{ document.documentElement.style.overflow = '' }
+    if (showPost||showRepost) {
+      const sy = window.scrollY
+      document.body.style.top = `-${sy}px`
+      document.body.classList.add('modal-open')
+    } else {
+      const sy = parseFloat(document.body.style.top||'0')
+      document.body.classList.remove('modal-open')
+      document.body.style.top = ''
+      if (sy) window.scrollTo(0, -sy)
+    }
+    return ()=>{ document.body.classList.remove('modal-open'); document.body.style.top = '' }
   },[showPost,showRepost])
 
   useEffect(()=>{
@@ -507,8 +517,13 @@ export default function App() {
   }
   function closeDetail() {
     if (postDetailRef.current) {
+      postDetailRef.current.style.animation = 'none'
       postDetailRef.current.style.transition = 'transform 0.28s ease'
       postDetailRef.current.style.transform = 'translateX(100%)'
+    }
+    if (detailBackdropRef.current) {
+      detailBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      detailBackdropRef.current.style.opacity = '0'
     }
     setTimeout(() => setSelectedPost(null), 290)
   }
@@ -586,9 +601,14 @@ export default function App() {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
           if (postDetailRef.current) {
-            postDetailRef.current.style.animation = 'none'  // kill slide-in-right so transition works
+            postDetailRef.current.style.animation = 'none'
             postDetailRef.current.style.transition = 'none'
             postDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          }
+          if (detailBackdropRef.current) {
+            detailBackdropRef.current.style.animation = 'none'
+            detailBackdropRef.current.style.transition = 'none'
+            detailBackdropRef.current.style.opacity = String(Math.max(0, 1 - dx / window.innerWidth))
           }
         }
         return
@@ -647,11 +667,20 @@ export default function App() {
             postDetailRef.current.style.transition = 'transform 0.28s ease'
             postDetailRef.current.style.transform = 'translateX(100%)'
           }
+          if (detailBackdropRef.current) {
+            detailBackdropRef.current.style.transition = 'opacity 0.28s ease'
+            detailBackdropRef.current.style.opacity = '0'
+          }
           setTimeout(() => setSelectedPost(null), 290)
         } else if (postDetailRef.current) {
           postDetailRef.current.style.animation = 'none'
           postDetailRef.current.style.transition = 'transform 0.25s ease'
           postDetailRef.current.style.transform = 'translateX(0)'
+          if (detailBackdropRef.current) {
+            detailBackdropRef.current.style.transition = 'opacity 0.25s ease'
+            detailBackdropRef.current.style.opacity = '1'
+            setTimeout(() => { if (detailBackdropRef.current) detailBackdropRef.current.style.transition = '' }, 260)
+          }
           setTimeout(() => { if (postDetailRef.current) postDetailRef.current.style.transition = '' }, 260)
         }
         swipeLocked.current = null
@@ -1293,7 +1322,8 @@ export default function App() {
         </div>
       )}
 
-      {selectedPost&&(
+      {selectedPost&&(<>
+        <div ref={detailBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
         <div ref={postDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,background:C.bg,zIndex:400,display:'flex',flexDirection:'column' as const}}>
           <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:'1px solid '+C.border,position:'sticky' as const,top:0,background:C.bg}}>
             <button onClick={closeDetail} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
@@ -1411,7 +1441,7 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+      </>)}
 
       {showRepost&&repostTarget&&(<>
         <div onClick={closeRepost} className={repostClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:499,background:'rgba(0,0,0,0.18)'}}/>
