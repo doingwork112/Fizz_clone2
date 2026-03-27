@@ -4,7 +4,20 @@
       "Bash(npx tsc:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/VWPXA.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/.claude/worktrees/modest-jackson/public/icon-192.png)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/VWPXA.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/.claude/worktrees/modest-jackson/public/apple-touch-icon.png)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/QMAJl.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/logo.jpg)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/image-1.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/icon-192.png)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/QMAJl.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/icon-192.jpg)",
+      "Read(//Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/**)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/VWPXA.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/av1.jpg)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/QMAJl.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/av2.jpg)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/image-1.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/av3.jpg)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/VWPXA.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/icon-192.png)",
+      "Bash(cp /Users/boyudeng/Desktop/FeidianAPP/APPLOGO/VWPXA.jpg /Users/boyudeng/Desktop/FeidianAPP/fizz-app/public/apple-touch-icon.png)",
+      "Bash(npx next:*)",
+      "Bash(node -e \"const fs=require\\(''fs''\\); const src=fs.readFileSync\\(''src/app/page.tsx'',''utf8''\\); let depth=0; const lines=src.split\\(''\\\\n''\\); for\\(let i=0;i<lines.length;i++\\){for\\(const c of lines[i]\\){if\\(c===''{''\\)depth++;if\\(c===''}''\\)depth--}; if\\(depth<0\\){console.log\\(''negative depth at line ''+\\(i+1\\)+'': ''+depth\\);break}} console.log\\(''final depth:'',depth\\)\")"
     ]
   }
 }
