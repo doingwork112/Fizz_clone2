@@ -487,7 +487,7 @@ export default function App() {
       setPullY(0)
     }
     // swipe between tabs (horizontal, more horizontal than vertical)
-    if (page === 'feed' && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    if (page === 'feed' && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
       const idx = FEED_TABS.indexOf(feedTab as any)
       if (dx < 0 && idx < FEED_TABS.length - 1) setFeedTab(FEED_TABS[idx + 1])
       if (dx > 0 && idx > 0) setFeedTab(FEED_TABS[idx - 1])
@@ -509,7 +509,7 @@ export default function App() {
         {/* main */}
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px',flexWrap:'wrap'}}>
-            <span style={{fontWeight:600,fontSize:'0.92rem',color:C.text}}>{name}</span>
+            <span style={{fontWeight:700,fontSize:'0.92rem',color:C.text}}>{name}</span>
             <span style={{color:C.muted,fontSize:'0.8rem'}}>{ago(p.created_at)}</span>
             {p.is_hot && <span style={{background:'#fef3c7',color:'#d97706',borderRadius:'4px',padding:'1px 6px',fontSize:'0.68rem',fontWeight:700}}>🔥 HOT</span>}
           </div>
@@ -578,7 +578,7 @@ export default function App() {
 
   // ── AUTH ──
   if (!session||!profile) return (
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'DM Sans',-apple-system,sans-serif"}}>
+    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'Varela Round','Nunito',-apple-system,sans-serif"}}>
       <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright,letterSpacing:'-1px'}}>heha</div>
       <div style={{width:'100%',maxWidth:'360px'}}>
         <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
@@ -632,7 +632,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'SF Pro Rounded','Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:500,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'86px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em'}}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -641,7 +641,7 @@ export default function App() {
       {/* ─── FEED ─── */}
       {page==='feed' && <>
         {topBar(
-          <><img src="/av1.jpg" alt="" style={{width:'32px',height:'32px',borderRadius:'50%',objectFit:'cover'}}/>{profile.school}</>,
+          <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>{profile.school}</span></>,
           <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
             <span style={{fontSize:'0.78rem',color:C.green,fontWeight:700,display:'flex',alignItems:'center',gap:'4px'}}>
               <span style={{width:'7px',height:'7px',borderRadius:'50%',background:C.green,display:'inline-block'}}/>
@@ -665,9 +665,11 @@ export default function App() {
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
           <div className={refreshing ? 'spin' : ''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform: refreshing ? undefined : `rotate(${pullY*4}deg)`,transition: refreshing ? 'none' : 'transform 0.1s'}}/>
         </div>
+        <div style={{touchAction:'pan-y'}}>
         {sorted().map(p=><PostCard key={p.id} p={p}/>)}
+        </div>
         {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
@@ -808,7 +810,7 @@ export default function App() {
           ))}
         </div>
         {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>暂无商品</div>}
-        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'60px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>List</span>
         </button>
@@ -852,14 +854,14 @@ export default function App() {
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
-        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'linear-gradient(135deg,#7c3aed,#2563eb)',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(124,58,237,0.45)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>setShowPost(true)} style={{position:'fixed',bottom:'90px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
       </>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'env(safe-area-inset-bottom)'}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:'max(env(safe-area-inset-bottom), 16px)'}}>
         {[
           {id:'feed',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
           {id:'messages',icon:(a:boolean)=><svg width="24" height="24" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.5:2}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
@@ -879,11 +881,11 @@ export default function App() {
       {/* ─── POST MODAL (Fizz-style bottom sheet) ─── */}
       {showPost && (<>
         {/* dimmed overlay */}
-        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.35)'}}/>
+        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:resolved==='light'?'rgba(0,0,0,0.25)':'rgba(0,0,0,0.45)'}}/>
         {/* sheet */}
         <div
           className={postClosing ? 'slide-down' : 'slide-up'}
-          style={{position:'fixed',top:'5vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)'}}
+          style={{position:'fixed',top:'12vh',left:0,right:0,bottom:0,zIndex:400,background:C.bg,display:'flex',flexDirection:'column',borderRadius:'16px 16px 0 0',transform:`translateY(${postDragY}px)`,transition:postDragY>0?'none':'transform 0.28s cubic-bezier(0.32,0.72,0,1)'}}
           onTouchStart={e=>{postDragStart.current=e.touches[0].clientY}}
           onTouchMove={e=>{const dy=e.touches[0].clientY-postDragStart.current; if(dy>0) setPostDragY(dy)}}
           onTouchEnd={()=>{ if(postDragY>110) closePost(); else setPostDragY(0) }}
