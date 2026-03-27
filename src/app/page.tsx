@@ -129,6 +129,8 @@ export default function App() {
   const postDragTrack = useRef(0)
   const repostSheetRef = useRef<HTMLDivElement>(null)
   const repostDragTrack = useRef(0)
+  const chatDetailRef = useRef<HTMLDivElement>(null)
+  const chatTargetRef = useRef<Profile|null>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -400,8 +402,12 @@ export default function App() {
   async function sendDm(){
     if(!profile||!dmTarget||!dmMsg.trim())return
     await sb.from('messages').insert({from_user_id:profile.id,to_user_id:dmTarget.user_id,text:dmMsg.trim()})
+    const target = {id:dmTarget.user_id,...(dmTarget.profiles as any)} as Profile
     setDmMsg('');setShowDm(false);setDmTarget(null)
-    loadConvos()
+    setPage('messages')
+    await loadConvos()
+    // Small delay so messages page renders first, then chat slides in
+    setTimeout(() => openChat(target), 60)
   }
 
   async function loadConvos() {
@@ -500,6 +506,13 @@ export default function App() {
     }
     setTimeout(() => setSelectedPost(null), 290)
   }
+  function closeChat() {
+    if (chatDetailRef.current) {
+      chatDetailRef.current.style.transition = 'transform 0.28s ease'
+      chatDetailRef.current.style.transform = 'translateX(100%)'
+    }
+    setTimeout(() => setChatTarget(null), 290)
+  }
   function closeRepost() {
     setRepostClosing(true)
     setRepostDragY(0)
@@ -543,6 +556,7 @@ export default function App() {
   selectedPostRef.current = selectedPost
   showPostRef.current = showPost
   showRepostRef.current = showRepost
+  chatTargetRef.current = chatTarget
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -562,13 +576,24 @@ export default function App() {
       // Post detail open: swipe-back (right). Override lock if clearly going right.
       if (selectedPostRef.current) {
         if (dx > 8) swipeLocked.current = 'h'
-        if (swipeLocked.current === 'h' && dx > 0 && e.cancelable) {
-          e.preventDefault()
+        if (swipeLocked.current === 'h' && dx > 0) {
+          if (e.cancelable) e.preventDefault()   // separate from transform — works even when non-cancelable
           swipeXRef.current = dx
           if (postDetailRef.current) {
             postDetailRef.current.style.transition = 'none'
             postDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
           }
+        }
+        return
+      }
+      // Chat detail open: same swipe-back pattern
+      if (chatDetailRef.current && chatTargetRef.current) {
+        if (dx > 8) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0) {
+          if (e.cancelable) e.preventDefault()
+          swipeXRef.current = dx
+          chatDetailRef.current.style.transition = 'none'
+          chatDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
         }
         return
       }
@@ -591,6 +616,19 @@ export default function App() {
     }
     async function onTE() {
       if (showPostRef.current || showRepostRef.current) { swipeLocked.current = null; swipeXRef.current = 0; return }
+      // Chat detail: complete swipe-back or snap back
+      if (chatDetailRef.current && chatTargetRef.current) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          chatDetailRef.current.style.transition = 'transform 0.25s ease'
+          chatDetailRef.current.style.transform = 'translateX(100%)'
+          setTimeout(() => setChatTarget(null), 260)
+        } else {
+          chatDetailRef.current.style.transition = 'transform 0.25s ease'
+          chatDetailRef.current.style.transform = 'translateX(0)'
+          setTimeout(() => { if (chatDetailRef.current) chatDetailRef.current.style.transition = '' }, 260)
+        }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
       // Post detail: complete swipe-back or snap back
       if (selectedPostRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
@@ -858,27 +896,27 @@ export default function App() {
           <div style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:700,borderBottom:`2px solid ${C.text}`,cursor:'pointer'}}>Posts</div>
           <div style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:400,color:C.muted,borderBottom:'2px solid transparent',cursor:'pointer'}}>Marketplace</div>
         </div>
-        {!chatTarget ? (
-          convos.length===0 ? (
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 20px',gap:'16px',color:C.muted}}>
-              <div style={{fontSize:'3.5rem'}}>✈️</div>
-              <div style={{fontWeight:700,fontSize:'1.1rem',color:C.text}}>No messages yet.</div>
-              <div style={{fontSize:'0.9rem',textAlign:'center',lineHeight:'1.5'}}>Start a conversation. Messages you send or receive will appear here.</div>
+        {convos.length===0 ? (
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 20px',gap:'16px',color:C.muted}}>
+            <div style={{fontSize:'3.5rem'}}>✈️</div>
+            <div style={{fontWeight:700,fontSize:'1.1rem',color:C.text}}>No messages yet.</div>
+            <div style={{fontSize:'0.9rem',textAlign:'center',lineHeight:'1.5'}}>Start a conversation. Messages you send or receive will appear here.</div>
+          </div>
+        ) : convos.map(({user:u,lastMsg})=>(
+          <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
+            <img src={avImg(u.id)} alt="" style={{width:'46px',height:'46px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
+              <div style={{fontSize:'0.85rem',color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lastMsg?.text||'开始对话'}</div>
             </div>
-          ) : convos.map(({user:u,lastMsg})=>(
-            <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
-              <img src={avImg(u.id)} alt="" style={{width:'46px',height:'46px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
-                <div style={{fontSize:'0.85rem',color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lastMsg?.text||'开始对话'}</div>
-              </div>
-              {lastMsg&&<div style={{fontSize:'0.75rem',color:C.muted,flexShrink:0}}>{ago(lastMsg.created_at)}</div>}
-            </div>
-          ))
-        ) : (
-          <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const}}>
-              <button onClick={()=>setChatTarget(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
+            {lastMsg&&<div style={{fontSize:'0.75rem',color:C.muted,flexShrink:0}}>{ago(lastMsg.created_at)}</div>}
+          </div>
+        ))}
+        {/* Chat detail — fixed overlay, slides in from right like post detail */}
+        {chatTarget&&(
+          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
+              <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
               <img src={avImg(chatTarget.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
               <div style={{fontWeight:700,flex:1}}>Anonymous</div>
               <button onClick={()=>setShowChatMenu(v=>!v)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1.2rem',padding:'4px'}}>•••</button>
@@ -908,7 +946,7 @@ export default function App() {
               })}
               {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
             </div>
-            <div style={{display:'flex',gap:'8px',padding:'12px 16px',borderTop:`1px solid ${C.border}`}}>
+            <div style={{display:'flex',gap:'8px',padding:'12px 16px',borderTop:`1px solid ${C.border}`,paddingBottom:'calc(12px + env(safe-area-inset-bottom))'}}>
               <input style={{...inp,fontSize:'0.9rem',flex:1}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
               <button onClick={sendMsg} style={{padding:'10px 16px',background:C.accentBright,color:'white',border:'none',borderRadius:'12px',fontWeight:700,cursor:'pointer'}}>发</button>
             </div>
