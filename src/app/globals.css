@@ -102,10 +102,9 @@ body.modal-open {
   touch-action: pan-y;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Hide scrollbar */
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
 
 /* Card */
 .fizz-card {

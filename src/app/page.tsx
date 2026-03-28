@@ -58,6 +58,7 @@ export default function App() {
 
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<Profile|null>(null)
+  const profileRef = useRef<Profile|null>(null)
   const [authTab, setAuthTab] = useState<'login'|'register'>('login')
   const [af, setAf] = useState({ email:'', pwd:'', username:'' })
   const [authLoading, setAuthLoading] = useState(false)
@@ -155,6 +156,7 @@ export default function App() {
   const [listingView, setListingView] = useState<'cat'|'cond'|null>(null)
   const [lPreviews, setLPreviews] = useState<string[]>([])
   const [lUploading, setLUploading] = useState(false)
+  const [listingPublished, setListingPublished] = useState(false)
   const [listingPhotoIdx, setListingPhotoIdx] = useState(0)
   const listingPhotoIdxRef = useRef(0)
   const [showSortSheet, setShowSortSheet] = useState(false)
@@ -260,12 +262,13 @@ export default function App() {
       origPosts?.forEach((p:any) => { repostMap[p.id] = p })
     }
     const withReposts = data.map((p:any) => ({...p, repost_of: p.repost_of_id ? repostMap[p.repost_of_id] : null}))
-    if (profile) {
-      const { data: votes } = await sb.from('fizzups').select('post_id,vote_type').eq('user_id',profile.id)
+    const currentProfile = profileRef.current
+    if (currentProfile) {
+      const { data: votes } = await sb.from('fizzups').select('post_id,vote_type').eq('user_id',currentProfile.id)
       const vm: Record<string,string> = {}; votes?.forEach((v:any)=>vm[v.post_id]=v.vote_type)
       setPosts(withReposts.map((p:any)=>({...p,my_vote:vm[p.id]||null})))
       // Reload profile so karma (total_fizzups) stays current
-      const { data: freshProfile } = await sb.from('profiles').select('*').eq('id', profile.id).single()
+      const { data: freshProfile } = await sb.from('profiles').select('*').eq('id', currentProfile.id).single()
       if (freshProfile) setProfile(freshProfile)
     } else setPosts(withReposts)
   }
@@ -373,8 +376,13 @@ export default function App() {
       if (profile.school) ins.school = profile.school
       const { error: insertErr } = await sb.from('listings').insert(ins)
       if (insertErr) { console.error('Listing insert error:', insertErr); setLUploading(false); return }
-      setShowListing(false); setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null)
-      loadListings()
+      setLUploading(false)
+      setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null)
+      // Show "已发布" confirmation then navigate to marketplace
+      setListingPublished(true)
+      await loadListings()
+      setTimeout(() => { setShowListing(false); setListingPublished(false); setPage('market') }, 1200)
+      return
     } catch(e) { console.error('submitListing error:', e) }
     setLUploading(false)
   }
@@ -685,6 +693,7 @@ export default function App() {
   const feedBodyRef = useRef<HTMLDivElement>(null)
   const feedSwipeDir = useRef(0)
   feedTabRef.current = feedTab
+  profileRef.current = profile
   pageRef.current = page
   pullYRef.current = pullY
   mktPullYRef.current = mktPullY
@@ -756,9 +765,9 @@ export default function App() {
         }
         return
       }
-      // Chat detail open: same swipe-back pattern
+      // Chat detail open: swipe-back only from left edge (40px), ignore if vertical scroll detected
       if (chatDetailRef.current && chatTargetRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40) swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -1142,7 +1151,7 @@ export default function App() {
             <div style={{position:'relative',marginLeft:'auto'}}>
               <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
               {showPostMenu===p.id&&(
-                <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.92)':'rgba(40,40,55,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.12)':'rgba(0,0,0,0.4)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
+                <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.65)':'rgba(50,50,70,0.55)',backdropFilter:'blur(28px) saturate(180%)',WebkitBackdropFilter:'blur(28px) saturate(180%)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
                   <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
                     <span>🚨</span> Report
                   </button>
@@ -1328,8 +1337,8 @@ export default function App() {
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
         {chatTarget&&(<>
           <div ref={chatBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
-          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
+          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))',background:C.bg,zIndex:10,flexShrink:0}}>
               <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
               <img src={avImg(chatTarget.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
               <div style={{fontWeight:700,flex:1}}>Anonymous</div>
@@ -1360,7 +1369,7 @@ export default function App() {
               })}
               {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
             </div>
-            <div style={{padding:'10px 12px',paddingBottom:'calc(10px + env(safe-area-inset-bottom))'}}>
+            <div style={{padding:'10px 12px',paddingBottom:'calc(10px + env(safe-area-inset-bottom))',flexShrink:0,background:C.bg,zIndex:10}}>
               <div style={{display:'flex',gap:'8px',alignItems:'center',background:resolved==='light'?'rgba(240,240,240,0.85)':'rgba(255,255,255,0.08)',backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',borderRadius:'24px',padding:'6px 6px 6px 16px'}}>
                 <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
                 <button onClick={sendMsg} style={{width:'36px',height:'36px',borderRadius:'50%',background:C.accentBright,color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1802,7 +1811,7 @@ export default function App() {
                   onChange={e=>setPostText(e.target.value)}
                   autoFocus
                 />
-                {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden',marginBottom:'8px'}}>{postPrevs.map((p,i)=><img key={i} src={p} alt="" style={{width:'100%',height:'100px',objectFit:'cover'}}/>)}</div>}
+                {postPrevs.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px',borderRadius:'12px',overflow:'hidden',marginBottom:'8px'}}>{postPrevs.map((p,i)=><div key={i} style={{position:'relative'}}><img src={p} alt="" style={{width:'100%',height:'100px',objectFit:'cover',display:'block'}}/><button onClick={()=>{setPostPrevs(pr=>pr.filter((_,j)=>j!==i));setPostImgs(im=>(im as any).filter((_:any,j:number)=>j!==i))}} style={{position:'absolute',top:'4px',right:'4px',width:'22px',height:'22px',borderRadius:'50%',background:'rgba(0,0,0,0.6)',color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',fontWeight:700,lineHeight:1}}>×</button></div>)}</div>}
               </div>
             )}
             {/* toolbar */}
@@ -1883,7 +1892,7 @@ export default function App() {
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gridTemplateRows:'auto auto',gap:'8px',height:'220px'}}>
                 {/* main large slot */}
                 <label htmlFor="limg" style={{gridRow:'1/3',borderRadius:'14px',border:`2px dashed ${C.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',background:lPreviews[0]?'transparent':C.surface,overflow:'hidden',position:'relative' as const}}>
-                  {lPreviews[0]?<img src={lPreviews[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<>
+                  {lPreviews[0]?<><img src={lPreviews[0]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/><button onClick={e=>{e.preventDefault();e.stopPropagation();setLPreviews(p=>p.filter((_,j)=>j!==0));setLFiles(f=>f.filter((_,j)=>j!==0))}} style={{position:'absolute',top:'8px',right:'8px',width:'24px',height:'24px',borderRadius:'50%',background:'rgba(0,0,0,0.6)',color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',fontWeight:700,zIndex:5}}>×</button></>:<>
                     <div style={{position:'relative',marginBottom:'8px'}}>
                       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                       <div style={{position:'absolute',top:'-4px',right:'-4px',width:'16px',height:'16px',borderRadius:'50%',background:'#ef4444',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px',fontWeight:700}}>+</div>
@@ -1894,7 +1903,7 @@ export default function App() {
                 {/* 4 small slots */}
                 {[1,2,3,4].map(i=>(
                   <label key={i} htmlFor="limg" style={{borderRadius:'12px',border:`2px dashed ${C.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',background:lPreviews[i]?'transparent':C.surface,overflow:'hidden',position:'relative' as const}}>
-                    {lPreviews[i]?<img src={lPreviews[i]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{position:'relative'}}>
+                    {lPreviews[i]?<><img src={lPreviews[i]} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/><button onClick={e=>{e.preventDefault();e.stopPropagation();setLPreviews(p=>p.filter((_,j)=>j!==i));setLFiles(f=>f.filter((_,j)=>j!==i))}} style={{position:'absolute',top:'4px',right:'4px',width:'20px',height:'20px',borderRadius:'50%',background:'rgba(0,0,0,0.6)',color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,zIndex:5}}>×</button></>:<div style={{position:'relative'}}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                       <div style={{position:'absolute',top:'-4px',right:'-4px',width:'13px',height:'13px',borderRadius:'50%',background:'#ef4444',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:700}}>+</div>
                     </div>}
@@ -1941,8 +1950,8 @@ export default function App() {
             </div>
 
             {/* LIST BUTTON */}
-            <button onClick={submitListing} disabled={!lf.title||lUploading} style={{marginTop:'32px',width:'100%',padding:'16px',borderRadius:'14px',background:lf.title&&!lUploading?C.accentBright:'#888',color:'white',border:'none',fontWeight:800,fontSize:'1rem',cursor:lf.title&&!lUploading?'pointer':'not-allowed',fontFamily:'inherit'}}>
-              {lUploading?'Listing…':'List item'}
+            <button onClick={submitListing} disabled={!lf.title||lUploading||listingPublished} style={{marginTop:'32px',width:'100%',padding:'16px',borderRadius:'14px',background:listingPublished?C.green:lf.title&&!lUploading?C.accentBright:'#888',color:'white',border:'none',fontWeight:800,fontSize:'1rem',cursor:lf.title&&!lUploading&&!listingPublished?'pointer':'not-allowed',fontFamily:'inherit',transition:'background 0.3s'}}>
+              {listingPublished?'已发布 ✓':lUploading?'Listing…':'List item'}
             </button>
           </div>
         </div>
