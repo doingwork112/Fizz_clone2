@@ -1085,7 +1085,7 @@ export default function App() {
     const cmtsOpen = !!openCmts[p.id]
 
     return (
-      <div onClick={()=>openPost(p)} style={{padding:'14px 14px 12px',display:'flex',gap:'12px',background:glassCard,cursor:'pointer',border:`1px solid ${softBorder}`,borderRadius:'24px',boxShadow:elevatedShadow,marginBottom:'12px'}}>
+      <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
         {/* avatar — wrapper div shows bg color while img loads, preventing flash */}
         <div style={{width:'36px',height:'36px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
           <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
@@ -1121,23 +1121,23 @@ export default function App() {
           )}
           {/* action row — matches Fizz: DM, Comment, Repost, Share, ••• */}
           {(() => { const ic = resolved==='light'?'#555':'#aaa'; return (
-          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'10px',marginTop:'14px',flexWrap:'wrap'}}>
-            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',justifyContent:'center',background:resolved==='light'?'rgba(17,17,17,0.04)':'rgba(255,255,255,0.05)',border:`1px solid ${softBorder}`,color:ic,cursor:'pointer',padding:'8px',borderRadius:'999px'}}>
+          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px'}}>
+            <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
-            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'5px',background:resolved==='light'?'rgba(17,17,17,0.04)':'rgba(255,255,255,0.05)',border:`1px solid ${softBorder}`,color:ic,cursor:'pointer',fontSize:'0.82rem',fontWeight:800,padding:'8px 10px',fontFamily:'inherit',borderRadius:'999px'}}>
+            <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:ic,cursor:'pointer',fontSize:'0.88rem',fontWeight:700,padding:0,fontFamily:'inherit'}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
               {p.comments_count||''}
             </button>
-            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'5px',background:resolved==='light'?'rgba(17,17,17,0.04)':'rgba(255,255,255,0.05)',border:`1px solid ${softBorder}`,color:ic,cursor:'pointer',fontSize:'0.82rem',fontWeight:800,padding:'8px 10px',fontFamily:'inherit',borderRadius:'999px'}}>
+            <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:ic,cursor:'pointer',fontSize:'0.88rem',fontWeight:700,padding:0,fontFamily:'inherit'}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
               {(p as any).reposts_count||''}
             </button>
-            <button style={{display:'flex',alignItems:'center',justifyContent:'center',background:resolved==='light'?'rgba(17,17,17,0.04)':'rgba(255,255,255,0.05)',border:`1px solid ${softBorder}`,color:ic,cursor:'pointer',padding:'8px',borderRadius:'999px'}}>
+            <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             </button>
             <div style={{position:'relative',marginLeft:'auto'}}>
-              <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:resolved==='light'?'rgba(17,17,17,0.04)':'rgba(255,255,255,0.05)',border:`1px solid ${softBorder}`,color:ic,cursor:'pointer',padding:'8px 10px',fontSize:'1rem',letterSpacing:'1px',fontWeight:800,borderRadius:'999px'}}>•••</button>
+              <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
               {showPostMenu===p.id&&(
                 <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.45)':'rgba(40,40,60,0.4)',backdropFilter:'blur(40px) saturate(200%)',WebkitBackdropFilter:'blur(40px) saturate(200%)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
                   <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
@@ -1194,225 +1194,41 @@ export default function App() {
     )
   }
 
-  const landingStats = [
-    { value:'24/7', label:'Campus energy' },
-    { value:'匿名', label:'真实发言更轻松' },
-    { value:'DM + Market', label:'一个 App 全搞定' },
-  ]
-  const landingFeatures = [
-    {
-      kicker:'Feed',
-      title:'匿名发帖也能很有氛围',
-      body:'Top、New、Heha! 三个流切换，热点、吐槽、八卦和互助都能被看见。',
-    },
-    {
-      kicker:'Messaging',
-      title:'想私聊就直接切到 DM',
-      body:'从帖子一键发消息，保留校园社区的轻社交感，又不会像公开评论区那样吵。',
-    },
-    {
-      kicker:'Marketplace',
-      title:'把二手交易并进同一个场域',
-      body:'卖课本、宿舍用品、演唱会票，不用再跳去另一个平台重新建关系。',
-    },
-  ]
-  const landingMoments = [
-    '今晚图书馆 3F 有谁还在赶 ddl？',
-    '求问 CS 的 office hour 哪个 TA 最靠谱',
-    '二手 AirPods 出，校内面交，$45',
-  ]
-
-  // ── AUTH / LANDING ──
+  // ── AUTH ──
   if (!session||!profile) return (
-    <div
-      style={{
-        minHeight:'100vh',
-        color:C.text,
-        fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",
-        background: resolved === 'light'
-          ? 'radial-gradient(circle at top left, rgba(250,177,90,0.24), transparent 30%), radial-gradient(circle at 85% 10%, rgba(37,99,235,0.18), transparent 26%), linear-gradient(180deg, #fffaf3 0%, #ffffff 28%, #fff7ee 100%)'
-          : 'radial-gradient(circle at top left, rgba(247,164,86,0.22), transparent 24%), radial-gradient(circle at 85% 10%, rgba(124,111,247,0.18), transparent 24%), linear-gradient(180deg, #11111a 0%, #0f0f13 42%, #151520 100%)',
-      }}
-    >
-      <div style={{maxWidth:'1180px',margin:'0 auto',padding:'24px 20px 52px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'16px',marginBottom:'32px',flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-            <img src="/logo-main.jpg" alt="Heha logo" style={{width:'44px',height:'44px',borderRadius:'14px',objectFit:'cover',boxShadow:`0 12px 30px ${C.shadow}`}} />
-            <div>
-              <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'1.45rem',letterSpacing:'-0.04em',color:C.text}}>Heha</div>
-              <div style={{fontSize:'0.82rem',color:C.muted}}>Campus-only anonymous social</div>
+    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif"}}>
+      <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright,letterSpacing:'-1px'}}>heha</div>
+      <div style={{width:'100%',maxWidth:'360px'}}>
+        <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
+          {(['login','register'] as const).map(t=>(
+            <div key={t} onClick={()=>setAuthTab(t)} style={{flex:1,padding:'10px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:700,fontSize:'0.92rem',background:authTab===t?C.accentBright:'transparent',color:authTab===t?'white':C.muted,transition:'all .2s'}}>
+              {t==='login'?'登录':'注册'}
             </div>
-          </div>
-          <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
-            <button onClick={()=>setAuthTab('login')} style={{padding:'11px 16px',borderRadius:'999px',border:`1px solid ${C.border}`,background:resolved==='light'?'rgba(255,255,255,0.72)':C.surface,color:C.text,fontWeight:800,cursor:'pointer'}}>Login</button>
-            <button onClick={()=>setAuthTab('register')} style={{padding:'11px 18px',borderRadius:'999px',border:'none',background:'linear-gradient(135deg, #ff8b5b 0%, #ff5f6d 45%, #845ef7 100%)',color:'white',fontWeight:900,cursor:'pointer',boxShadow:'0 16px 32px rgba(132,94,247,0.26)'}}>Get on campus</button>
-          </div>
+          ))}
         </div>
-
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))',gap:'26px',alignItems:'start'}}>
-          <div style={{display:'grid',gap:'22px'}}>
-            <div style={{display:'grid',gap:'18px'}}>
-              <div style={{display:'inline-flex',alignItems:'center',gap:'8px',padding:'10px 14px',borderRadius:'999px',background:resolved==='light'?'rgba(255,255,255,0.72)':'rgba(24,24,31,0.82)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`,boxShadow:`0 16px 40px ${resolved==='light'?'rgba(255,191,120,0.16)':'rgba(0,0,0,0.2)'}`,width:'fit-content'}}>
-                <span style={{width:'10px',height:'10px',borderRadius:'50%',background:'#22c55e',boxShadow:'0 0 0 6px rgba(34,197,94,0.12)'}} />
-                <span style={{fontSize:'0.86rem',fontWeight:800,color:C.text}}>The campus feed that actually feels alive</span>
-              </div>
-              <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'clamp(3rem, 6vw, 5.4rem)',lineHeight:0.92,letterSpacing:'-0.06em',maxWidth:'760px'}}>
-                Fizz-style campus energy,
-                <span style={{display:'block',background:'linear-gradient(135deg, #ff915f 0%, #7c6ff7 58%, #2563eb 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>rebuilt around your app.</span>
-              </div>
-              <div style={{maxWidth:'680px',fontSize:'1.08rem',lineHeight:1.7,color:C.muted,fontWeight:700}}>
-                Heha keeps the anonymous, fast-moving, campus-first vibe of Fizz, but adds your own app structure: feed, DMs, marketplace, hot takes, reposts, and lightweight identity that still feels playful.
-              </div>
-              <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
-                <button onClick={()=>setAuthTab('register')} style={{padding:'15px 22px',borderRadius:'18px',border:'none',background:'linear-gradient(135deg, #ff8b5b 0%, #ff5f6d 36%, #845ef7 100%)',color:'white',fontWeight:900,fontSize:'1rem',cursor:'pointer',boxShadow:'0 18px 36px rgba(132,94,247,0.28)'}}>Create your account</button>
-                <button onClick={()=>setAuthTab('login')} style={{padding:'15px 22px',borderRadius:'18px',border:`1px solid ${C.border}`,background:resolved==='light'?'rgba(255,255,255,0.78)':C.surface,color:C.text,fontWeight:900,fontSize:'1rem',cursor:'pointer'}}>I already have one</button>
-              </div>
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:'12px'}}>
-              {landingStats.map(stat=>(
-                <div key={stat.label} style={{padding:'18px 18px 16px',borderRadius:'22px',background:resolved==='light'?'rgba(255,255,255,0.82)':'rgba(24,24,31,0.88)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`,boxShadow:`0 18px 40px ${resolved==='light'?'rgba(34,34,34,0.06)':'rgba(0,0,0,0.26)'}`}}>
-                  <div style={{fontFamily:'Nunito,sans-serif',fontSize:'1.45rem',fontWeight:900,letterSpacing:'-0.04em'}}>{stat.value}</div>
-                  <div style={{marginTop:'4px',fontSize:'0.88rem',color:C.muted,fontWeight:700,lineHeight:1.4}}>{stat.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:'18px',alignItems:'stretch'}}>
-              <div style={{padding:'22px',borderRadius:'30px',background:resolved==='light'?'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,247,238,0.96) 100%)':'linear-gradient(180deg, rgba(30,30,40,0.96) 0%, rgba(21,21,30,0.98) 100%)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`,boxShadow:`0 28px 70px ${resolved==='light'?'rgba(255,158,76,0.14)':'rgba(0,0,0,0.3)'}`}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'18px'}}>
-                  <div>
-                    <div style={{fontWeight:900,fontSize:'1.08rem'}}>Campus feed preview</div>
-                    <div style={{fontSize:'0.84rem',color:C.muted,marginTop:'4px'}}>What your website promises, your app already ships.</div>
-                  </div>
-                  <div style={{display:'flex',gap:'6px'}}>
-                    {['Top','Heha!','New'].map(tab=>(
-                      <div key={tab} style={{padding:'7px 10px',borderRadius:'999px',background:tab==='Heha!'?'linear-gradient(135deg, #ff8b5b 0%, #845ef7 100%)':(resolved==='light'?'#fff':'rgba(255,255,255,0.04)'),color:tab==='Heha!'?'white':C.muted,fontSize:'0.76rem',fontWeight:900,border:`1px solid ${tab==='Heha!'?'transparent':C.border}`}}>{tab}</div>
-                    ))}
-                  </div>
-                </div>
-                <div style={{display:'grid',gap:'12px'}}>
-                  {landingMoments.map((moment, index)=>(
-                    <div key={moment} style={{padding:'16px',borderRadius:'22px',background:resolved==='light'?'#ffffff':'rgba(255,255,255,0.03)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`}}>
-                      <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
-                        <div style={{width:'34px',height:'34px',borderRadius:'50%',background:index===0?'#ffd6bf':index===1?'#d9d4ff':'#c8f1e4',display:'grid',placeItems:'center',fontSize:'1rem'}}>{['🌶️','📚','🛒'][index]}</div>
-                        <div>
-                          <div style={{fontSize:'0.84rem',fontWeight:900}}>Anonymous</div>
-                          <div style={{fontSize:'0.74rem',color:C.muted}}>{['2m ago','12m ago','24m ago'][index]}</div>
-                        </div>
-                      </div>
-                      <div style={{fontSize:'0.96rem',lineHeight:1.55,fontWeight:700}}>{moment}</div>
-                      <div style={{display:'flex',gap:'16px',marginTop:'12px',fontSize:'0.78rem',color:C.muted,fontWeight:800}}>
-                        <span>↑ {['42','16','9'][index]}</span>
-                        <span>💬 {['18','6','4'][index]}</span>
-                        <span>↗ repost</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{display:'grid',gap:'18px'}}>
-                <div style={{padding:'18px',borderRadius:'28px',background:'linear-gradient(180deg, rgba(132,94,247,0.94) 0%, rgba(59,130,246,0.92) 100%)',color:'white',boxShadow:'0 28px 60px rgba(99,102,241,0.28)'}}>
-                  <div style={{fontSize:'0.78rem',fontWeight:900,opacity:0.82,letterSpacing:'0.08em',textTransform:'uppercase'}}>Marketplace</div>
-                  <div style={{marginTop:'10px',fontSize:'1.12rem',fontWeight:900,lineHeight:1.2}}>Sell a textbook, find a concert ticket, message the seller instantly.</div>
-                  <div style={{marginTop:'14px',padding:'14px',borderRadius:'20px',background:'rgba(255,255,255,0.14)',backdropFilter:'blur(10px)'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.84rem',fontWeight:800}}>
-                      <span>AirPods Pro</span>
-                      <span>$45</span>
-                    </div>
-                    <div style={{marginTop:'8px',fontSize:'0.78rem',lineHeight:1.5,opacity:0.86}}>Campus pickup. Posted 18m ago. Seller reply rate 96%.</div>
-                  </div>
-                </div>
-
-                <div style={{padding:'18px',borderRadius:'28px',background:resolved==='light'?'rgba(255,255,255,0.88)':'rgba(24,24,31,0.88)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`,boxShadow:`0 20px 48px ${resolved==='light'?'rgba(34,34,34,0.07)':'rgba(0,0,0,0.22)'}`}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}}>
-                    <div style={{fontWeight:900}}>DM preview</div>
-                    <div style={{padding:'6px 10px',borderRadius:'999px',background:resolved==='light'?'#fff7ed':'rgba(255,255,255,0.04)',color:'#fb923c',fontSize:'0.72rem',fontWeight:900}}>private</div>
-                  </div>
-                  <div style={{display:'grid',gap:'10px'}}>
-                    <div style={{justifySelf:'start',maxWidth:'82%',padding:'10px 12px',borderRadius:'16px 16px 16px 6px',background:resolved==='light'?'#f3f4f6':C.surface2,fontSize:'0.84rem',lineHeight:1.45}}>Hey, are you still selling the lamp?</div>
-                    <div style={{justifySelf:'end',maxWidth:'82%',padding:'10px 12px',borderRadius:'16px 16px 6px 16px',background:'linear-gradient(135deg, #ff8b5b 0%, #845ef7 100%)',color:'white',fontSize:'0.84rem',lineHeight:1.45}}>Yup, can meet outside the library at 6.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))',gap:'12px'}}>
-              {landingFeatures.map(item=>(
-                <div key={item.title} style={{padding:'18px',borderRadius:'24px',background:resolved==='light'?'rgba(255,255,255,0.84)':'rgba(24,24,31,0.86)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`}}>
-                  <div style={{fontSize:'0.72rem',fontWeight:900,letterSpacing:'0.08em',textTransform:'uppercase',color:C.accentBright}}>{item.kicker}</div>
-                  <div style={{marginTop:'10px',fontSize:'1.04rem',lineHeight:1.2,fontWeight:900}}>{item.title}</div>
-                  <div style={{marginTop:'9px',fontSize:'0.88rem',lineHeight:1.6,color:C.muted,fontWeight:700}}>{item.body}</div>
-                </div>
-              ))}
-            </div>
+        {authTab==='register' && <>
+          <div style={{marginBottom:'12px'}}>
+            <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'.5px'}}>昵称</label>
+            <input style={inp} placeholder="你的名字" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} />
           </div>
-
-          <div style={{position:'sticky',top:'20px'}}>
-            <div style={{padding:'22px',borderRadius:'30px',background:resolved==='light'?'rgba(255,255,255,0.92)':'rgba(24,24,31,0.94)',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`,boxShadow:`0 30px 70px ${resolved==='light'?'rgba(255,154,86,0.14)':'rgba(0,0,0,0.34)'}`}}>
-              <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
-                <div style={{width:'40px',height:'40px',borderRadius:'14px',background:'linear-gradient(135deg, #ff8b5b 0%, #ff5f6d 42%, #845ef7 100%)',display:'grid',placeItems:'center',color:'white',fontWeight:900,fontSize:'1rem'}}>H</div>
-                <div>
-                  <div style={{fontWeight:900,fontSize:'1.08rem'}}>Join Heha</div>
-                  <div style={{fontSize:'0.82rem',color:C.muted}}>Sign in to the campus feed, marketplace, and DMs.</div>
-                </div>
-              </div>
-
-              <div style={{display:'flex',background:resolved==='light'?'#f8fafc':C.surface,borderRadius:'16px',padding:'4px',marginBottom:'18px',border:`1px solid ${resolved==='light'?'rgba(17,17,17,0.05)':C.border}`}}>
-                {(['login','register'] as const).map(t=>(
-                  <div key={t} onClick={()=>setAuthTab(t)} style={{flex:1,padding:'11px 12px',textAlign:'center',borderRadius:'12px',cursor:'pointer',fontWeight:900,fontSize:'0.92rem',background:authTab===t?'linear-gradient(135deg, #ff8b5b 0%, #845ef7 100%)':'transparent',color:authTab===t?'white':C.muted,transition:'all .2s'}}>
-                    {t==='login'?'登录':'注册'}
-                  </div>
-                ))}
-              </div>
-
-              {authTab==='register' && (
-                <div style={{marginBottom:'12px'}}>
-                  <label style={{fontSize:'0.76rem',fontWeight:900,color:C.muted,display:'block',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.08em'}}>昵称</label>
-                  <input style={{...inp,background:resolved==='light'?'#f8fafc':C.surface}} placeholder="你的名字" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} />
-                </div>
-              )}
-
-              <div style={{marginBottom:'12px'}}>
-                <label style={{fontSize:'0.76rem',fontWeight:900,color:C.muted,display:'block',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.08em'}}>邮箱</label>
-                <input style={{...inp,background:resolved==='light'?'#f8fafc':C.surface}} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} />
-              </div>
-
-              <div style={{marginBottom:'16px'}}>
-                <label style={{fontSize:'0.76rem',fontWeight:900,color:C.muted,display:'block',marginBottom:'6px',textTransform:'uppercase',letterSpacing:'.08em'}}>密码</label>
-                <input style={{...inp,background:resolved==='light'?'#f8fafc':C.surface}} type="password" placeholder="至少 6 位" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} />
-              </div>
-
-              {authErr && <div style={{background:resolved==='dark'?'rgba(247,111,111,.15)':'#fef2f2',border:`1px solid ${C.red}`,borderRadius:'14px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
-
-              <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'15px',background:'linear-gradient(135deg, #ff8b5b 0%, #ff5f6d 38%, #845ef7 100%)',color:'white',border:'none',borderRadius:'16px',fontWeight:900,fontSize:'1rem',cursor:'pointer',opacity:authLoading?.6:1,boxShadow:'0 18px 34px rgba(132,94,247,0.22)'}}>
-                {authLoading?'处理中…':authTab==='login'?'登录进入校园':'创建账号开始玩'}
-              </button>
-
-              <div style={{marginTop:'14px',fontSize:'0.84rem',color:C.muted,lineHeight:1.6}}>
-                {authTab==='login'?'还没有账号？':'已有账号？'}
-                <span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'6px',fontWeight:900}}>
-                  {authTab==='login'?'去注册':'去登录'}
-                </span>
-              </div>
-
-              <div style={{marginTop:'18px',paddingTop:'18px',borderTop:`1px solid ${resolved==='light'?'rgba(17,17,17,0.06)':C.border}`,display:'grid',gap:'10px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:'0.82rem',color:C.muted,fontWeight:800}}>匿名发言</span>
-                  <span style={{fontSize:'0.82rem',fontWeight:900}}>On by default</span>
-                </div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:'0.82rem',color:C.muted,fontWeight:800}}>校园 DM</span>
-                  <span style={{fontSize:'0.82rem',fontWeight:900}}>Built in</span>
-                </div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:'0.82rem',color:C.muted,fontWeight:800}}>二手交易</span>
-                  <span style={{fontSize:'0.82rem',fontWeight:900}}>Live marketplace</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        </>}
+        <div style={{marginBottom:'12px'}}>
+          <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'.5px'}}>邮箱</label>
+          <input style={inp} type="email" placeholder="you@university.edu" value={af.email} onChange={e=>setAf(f=>({...f,email:e.target.value}))} />
+        </div>
+        <div style={{marginBottom:'20px'}}>
+          <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'.5px'}}>密码</label>
+          <input style={inp} type="password" placeholder="至少6位" value={af.pwd} onChange={e=>setAf(f=>({...f,pwd:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&(authTab==='login'?handleLogin():handleRegister())} />
+        </div>
+        {authErr && <div style={{background:resolved==='dark'?'rgba(247,111,111,.15)':'#fef2f2',border:`1px solid ${C.red}`,borderRadius:'10px',padding:'10px 14px',marginBottom:'14px',fontSize:'0.88rem',color:C.red}}>{authErr}</div>}
+        <button onClick={authTab==='login'?handleLogin:handleRegister} disabled={authLoading} style={{width:'100%',padding:'14px',background:C.accentBright,color:'white',border:'none',borderRadius:'14px',fontWeight:700,fontSize:'1rem',cursor:'pointer',opacity:authLoading?.6:1}}>
+          {authLoading?'处理中…':authTab==='login'?'登录':'创建账号'}
+        </button>
+        <div style={{textAlign:'center',marginTop:'14px',fontSize:'0.85rem',color:C.muted}}>
+          {authTab==='login'?'还没有账号？':'已有账号？'}
+          <span onClick={()=>setAuthTab(authTab==='login'?'register':'login')} style={{color:C.accentBright,cursor:'pointer',marginLeft:'4px'}}>
+            {authTab==='login'?'注册':'登录'}
+          </span>
         </div>
       </div>
     </div>
@@ -1430,73 +1246,62 @@ export default function App() {
     if (mktSort==='highest') return b.price-a.price
     return new Date(b.created_at).getTime()-new Date(a.created_at).getTime() // newest
   })
-  const shellBg = resolved === 'light'
-    ? 'linear-gradient(180deg, #fff9f2 0%, #ffffff 18%, #fff6ed 100%)'
-    : 'linear-gradient(180deg, #12121a 0%, #0f0f13 20%, #171724 100%)'
-  const glassCard = resolved === 'light'
-    ? 'rgba(255,255,255,0.82)'
-    : 'rgba(24,24,31,0.88)'
-  const softBorder = resolved === 'light' ? 'rgba(17,17,17,0.06)' : C.border
-  const elevatedShadow = resolved === 'light' ? '0 20px 50px rgba(31,41,55,0.08)' : '0 22px 54px rgba(0,0,0,0.3)'
-  const accentGradient = 'linear-gradient(135deg, #ff8b5b 0%, #ff5f6d 36%, #845ef7 100%)'
-  const coolGradient = 'linear-gradient(135deg, #1a3a5c 0%, #2563eb 52%, #7c6ff7 100%)'
   const topBar = (title: React.ReactNode, right?: React.ReactNode, noBorder?: boolean) => (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 12px',paddingTop:'calc(14px + env(safe-area-inset-top))',background:resolved==='light'?'rgba(255,255,255,0.7)':'rgba(15,15,19,0.72)',backdropFilter:'blur(22px) saturate(180%)',WebkitBackdropFilter:'blur(22px) saturate(180%)',position:'sticky',top:0,zIndex:100,...(noBorder?{}:{borderBottom:`1px solid ${softBorder}`})}}>
-      <div style={{fontWeight:800,fontSize:'1.02rem',display:'flex',alignItems:'center',gap:'10px',letterSpacing:'-0.02em'}}>{title}</div>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,...(noBorder?{}:{borderBottom:`1px solid ${C.border}`})}}>
+      <div style={{fontWeight:700,fontSize:'1.05rem',display:'flex',alignItems:'center',gap:'8px'}}>{title}</div>
       {right}
     </div>
   )
 
   return (
     <div
-      style={{minHeight:'100dvh',background:shellBg,color:C.text,fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
     >
 
       {/* ─── FEED ─── */}
       {page==='feed' && <div className="feed-swipe">
         {topBar(
-          <><img src="/logo-main.jpg" alt="" style={{width:'34px',height:'34px',borderRadius:'14px',objectFit:'cover',border:`1px solid ${softBorder}`,boxShadow:'0 12px 24px rgba(0,0,0,0.12)'}}/><div><div style={{fontWeight:900,fontSize:'1rem'}}>Heha</div><div style={{fontSize:'0.72rem',color:C.muted,fontWeight:800}}>Campus feed</div></div></>,
-          <button onClick={()=>setShowActivity(true)} style={{background:resolved==='light'?'rgba(255,255,255,0.82)':glassCard,border:`1px solid ${softBorder}`,cursor:'pointer',padding:'8px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'14px',boxShadow:elevatedShadow}}>
+          <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>Heha</span></>,
+          <button onClick={()=>setShowActivity(true)} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center'}}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
           </button>,
           true
         )}
-        <div style={{padding:'0 16px 12px',position:'sticky',top:'74px',zIndex:99,background:resolved==='light'?'rgba(255,255,255,0.72)':'rgba(15,15,19,0.72)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)'}}>
-          <div style={{display:'flex',position:'relative',padding:'4px',borderRadius:'18px',background:glassCard,border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
+        <div style={{background:C.bg,position:'sticky',top:'53px',zIndex:99,borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',position:'relative'}}>
             {(['Top','Heha!','New'] as const).map(t=>(
-              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'11px 10px',textAlign:'center',fontSize:'0.9rem',fontWeight:feedTab===t?900:800,color:feedTab===t?'white':C.muted,cursor:'pointer',transition:'color .2s',position:'relative',zIndex:2}}>
+              <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?900:700,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
                 {t}
               </div>
             ))}
-            <div ref={indicatorRef} style={{position:'absolute',top:'4px',bottom:'4px',width:'33.333%',background:accentGradient,borderRadius:'14px',left:`${(['Top','Heha!','New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)',boxShadow:'0 14px 24px rgba(132,94,247,0.24)'}}/>
+            {/* sliding indicator — follows finger via ref, no re-render */}
+            <div ref={indicatorRef} style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${(['Top','Heha!','New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
           </div>
         </div>
         {/* pull-to-refresh indicator */}
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height: refreshing ? '52px' : `${pullY}px`,transition: pullY===0 ? 'height 0.25s ease' : 'none'}}>
           <div className={refreshing ? 'spin' : ''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform: refreshing ? undefined : `rotate(${pullY*4}deg)`,transition: refreshing ? 'none' : 'transform 0.1s'}}/>
         </div>
-        <div ref={feedBodyRef} style={{willChange:'transform',padding:'0 12px 12px'}}>
+        <div ref={feedBodyRef} style={{willChange:'transform'}}>
           {sorted().map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
           {posts.length===0&&!refreshing&&<div style={{textAlign:'center',padding:'60px',color:C.muted}}>还没有帖子，来发第一条吧！</div>}
         </div>
-        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:accentGradient,color:'white',border:'none',borderRadius:'999px',padding:'14px 20px',fontWeight:900,fontSize:'0.98rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'7px':'0',boxShadow:'0 20px 36px rgba(132,94,247,0.32)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
-          <span style={{maxWidth:fabExpanded?'56px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
+          <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
       </div>}
 
       {/* ─── MESSAGES ─── */}
       {page==='messages' && <>
-        {topBar(<><span>Messages</span><span style={{fontSize:'0.74rem',color:C.muted,fontWeight:800}}>Stay in the loop</span></>, undefined, true)}
+        {topBar('Messages', undefined, true)}
         {/* Messages pull-to-refresh indicator */}
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:msgRefreshing?'52px':`${msgPullY}px`,transition:msgPullY===0?'height 0.25s ease':'none'}}>
           <div className={msgRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:msgRefreshing?undefined:`rotate(${msgPullY*4}deg)`,transition:msgRefreshing?'none':'transform 0.1s'}}/>
         </div>
-        <div style={{padding:'0 16px 14px'}}>
-          <div style={{display:'flex',padding:'4px',borderRadius:'18px',background:glassCard,border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
-            <div onClick={()=>setMsgTab('posts')} style={{flex:1,padding:'11px',textAlign:'center',fontSize:'0.9rem',fontWeight:900,color:msgTab==='posts'?'white':C.muted,background:msgTab==='posts'?accentGradient:'transparent',borderRadius:'14px',cursor:'pointer'}}>Posts</div>
-            <div onClick={()=>setMsgTab('market')} style={{flex:1,padding:'11px',textAlign:'center',fontSize:'0.9rem',fontWeight:900,color:msgTab==='market'?'white':C.muted,background:msgTab==='market'?accentGradient:'transparent',borderRadius:'14px',cursor:'pointer'}}>Marketplace</div>
-          </div>
+        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`}}>
+          <div onClick={()=>setMsgTab('posts')} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:msgTab==='posts'?700:400,color:msgTab==='posts'?C.text:C.muted,borderBottom:msgTab==='posts'?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer'}}>Posts</div>
+          <div onClick={()=>setMsgTab('market')} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:msgTab==='market'?700:400,color:msgTab==='market'?C.text:C.muted,borderBottom:msgTab==='market'?`2px solid ${C.text}`:'2px solid transparent',cursor:'pointer'}}>Marketplace</div>
         </div>
         {(()=>{
           const filtered = convos.filter(({user:u})=>msgTab==='market'?mktConvoPartners.includes(u.id):!mktConvoPartners.includes(u.id))
@@ -1506,8 +1311,8 @@ export default function App() {
               <div style={{fontWeight:700,fontSize:'1.1rem',color:C.text}}>{msgTab==='market'?'No marketplace messages.':'No messages yet.'}</div>
               <div style={{fontSize:'0.9rem',textAlign:'center',lineHeight:'1.5'}}>{msgTab==='market'?'Messages with sellers will appear here.':'Start a conversation. Messages you send or receive will appear here.'}</div>
             </div>
-          ) : <div style={{display:'grid',gap:'10px',padding:'0 12px 12px'}}>{filtered.map(({user:u,lastMsg})=>(
-            <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'15px 14px',cursor:'pointer',alignItems:'center',background:glassCard,border:`1px solid ${softBorder}`,borderRadius:'22px',boxShadow:elevatedShadow}}>
+          ) : filtered.map(({user:u,lastMsg})=>(
+            <div key={u.id} onClick={()=>openChat(u)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer',alignItems:'center'}}>
             <img src={avImg(u.id)} alt="" style={{width:'46px',height:'46px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
@@ -1515,7 +1320,7 @@ export default function App() {
             </div>
             {lastMsg&&<div style={{fontSize:'0.75rem',color:C.muted,flexShrink:0}}>{ago(lastMsg.created_at)}</div>}
           </div>
-          ))}</div>
+          ))
         })()}
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
         {chatTarget&&(<>
@@ -1666,20 +1471,20 @@ export default function App() {
       {/* ─── MARKET ─── */}
       {page==='market' && <>
         {/* Search bar */}
-        <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:resolved==='light'?'rgba(255,255,255,0.72)':'rgba(15,15,19,0.72)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${softBorder}`}}>
-          <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:glassCard,borderRadius:'22px',padding:'11px 14px',border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 16px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
+          <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'22px',padding:'10px 14px'}}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input value={mktSearch} onChange={e=>setMktSearch(e.target.value)} placeholder="Search Rice Marketplace" style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.9rem',fontFamily:'inherit'}}/>
           </div>
-          <button onClick={()=>setMktMyView('saved')} style={{background:glassCard,border:`1px solid ${softBorder}`,cursor:'pointer',padding:'9px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px',boxShadow:elevatedShadow}}>
+          <button onClick={()=>setMktMyView('saved')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill={mktMyView==='saved'?C.text:'none'} stroke={C.text} strokeWidth="2.2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
           </button>
-          <button onClick={()=>setMktMyView('mine')} style={{background:glassCard,border:`1px solid ${softBorder}`,cursor:'pointer',padding:'9px',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'16px',boxShadow:elevatedShadow}}>
+          <button onClick={()=>setMktMyView('mine')} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center',justifyContent:'center'}}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={mktMyView==='mine'?C.accentBright:C.text} strokeWidth="2.2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           </button>
         </div>
         {/* Filter pills */}
-        <div style={{display:'flex',gap:'8px',padding:'10px 12px 12px',overflowX:'auto',scrollbarWidth:'none'}}>
+        <div style={{display:'flex',gap:'8px',padding:'10px 12px',overflowX:'auto',borderBottom:`1px solid ${C.border}`,scrollbarWidth:'none'}}>
           <button onClick={()=>setShowSortSheet(true)} style={{flexShrink:0,display:'flex',alignItems:'center',gap:'4px',padding:'7px 14px',borderRadius:'20px',border:`1px solid ${mktSort!=='newest'?C.accentBright:C.border}`,background:mktSort!=='newest'?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):'transparent',color:mktSort!=='newest'?C.accentBright:C.text,fontSize:'0.84rem',fontWeight:600,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
             {mktSort==='newest'?'Sort by':mktSort==='oldest'?'Oldest':mktSort==='lowest'?'Lowest $':'Highest $'} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="7 16 12 21 17 16"/><polyline points="7 8 12 3 17 8"/></svg>
           </button>
@@ -1700,7 +1505,7 @@ export default function App() {
         {/* Grid */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px',padding:'12px'}}>
           {mktFiltered.map(l=>(
-            <div key={l.id} onClick={()=>setSelectedListing(l)} style={{background:glassCard,borderRadius:'22px',overflow:'hidden',cursor:'pointer',border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
+            <div key={l.id} onClick={()=>setSelectedListing(l)} style={{background:C.bg,borderRadius:'16px',overflow:'hidden',cursor:'pointer',border:`1px solid ${C.border}`,boxShadow:resolved==='light'?'0 2px 8px rgba(0,0,0,0.07)':'none'}}>
               <div style={{aspectRatio:'1',background:C.surface,position:'relative',overflow:'hidden'}}>
                 {l.images&&l.images.length>0
                   ? <img src={l.images[0]} alt={l.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
@@ -1720,7 +1525,7 @@ export default function App() {
         </div>
         {mktFiltered.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px',fontSize:'0.95rem'}}>No listings found</div>}
         {/* List FAB */}
-        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'105px',right:'16px',background:coolGradient,color:'white',border:'none',borderRadius:'999px',padding:'14px 20px',fontWeight:900,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',boxShadow:'0 18px 36px rgba(37,99,235,0.28)',zIndex:150}}>
+        <button onClick={()=>setShowListing(true)} style={{position:'fixed',bottom:'105px',right:'16px',background:C.accentBright,color:'white',border:'none',borderRadius:'28px',padding:'14px 20px',fontWeight:800,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'6px',boxShadow:'0 4px 20px rgba(37,99,235,0.4)',zIndex:150}}>
           <span style={{fontSize:'1.1rem',lineHeight:1}}>＋</span>
           <span>List</span>
         </button>
@@ -1846,9 +1651,9 @@ export default function App() {
         {/* Banner + avatar header */}
         <div style={{position:'relative',marginBottom:'0'}}>
           {/* Blue gradient banner */}
-          <div style={{height:'124px',background:coolGradient,position:'relative',borderRadius:'0 0 28px 28px',boxShadow:'0 24px 48px rgba(37,99,235,0.22)'}}>
+          <div style={{height:'100px',background:`linear-gradient(135deg, #1a3a5c 0%, #2563eb 100%)`,position:'relative'}}>
             {/* Settings button */}
-            <button onClick={()=>setShowSettings(true)} style={{position:'absolute',top:'calc(12px + env(safe-area-inset-top))',right:'14px',background:'rgba(255,255,255,0.18)',border:'1px solid rgba(255,255,255,0.18)',cursor:'pointer',borderRadius:'16px',width:'38px',height:'38px',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',backdropFilter:'blur(8px)'}}>⚙️</button>
+            <button onClick={()=>setShowSettings(true)} style={{position:'absolute',top:'calc(10px + env(safe-area-inset-top))',right:'14px',background:'rgba(255,255,255,0.18)',border:'none',cursor:'pointer',borderRadius:'50%',width:'34px',height:'34px',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',backdropFilter:'blur(4px)'}}>⚙️</button>
           </div>
           {/* Avatar overlapping banner */}
           <div style={{position:'absolute',bottom:'-36px',left:'16px',width:'72px',height:'72px',borderRadius:'50%',overflow:'hidden',border:`3px solid ${C.bg}`,background:avColor(profile.id),boxShadow:'0 2px 12px rgba(0,0,0,0.15)'}}>
@@ -1856,19 +1661,19 @@ export default function App() {
           </div>
         </div>
         {/* Username + bio area */}
-        <div style={{paddingTop:'46px',paddingLeft:'16px',paddingRight:'16px',paddingBottom:'16px',borderBottom:`1px solid ${softBorder}`}}>
+        <div style={{paddingTop:'46px',paddingLeft:'16px',paddingRight:'16px',paddingBottom:'16px',borderBottom:`1px solid ${C.border}`}}>
           <div style={{fontWeight:900,fontSize:'1.25rem',color:C.text,marginBottom:'2px'}}>{profile.username}</div>
           <div style={{fontSize:'0.84rem',color:C.muted,marginBottom:'12px'}}>{profile.school}</div>
           {/* Stats */}
           <div style={{display:'flex',gap:'12px'}}>
-            <div style={{background:glassCard,borderRadius:'20px',padding:'12px 18px',flex:1,border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
+            <div style={{background:C.surface,borderRadius:'14px',padding:'12px 18px',flex:1,border:`1px solid ${C.border}`}}>
               <div style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
                 <span style={{fontSize:'1rem'}}>❤️</span>
                 <span style={{fontWeight:900,fontSize:'1.3rem',color:C.text}}>{profile.total_fizzups}</span>
               </div>
               <div style={{fontSize:'0.78rem',color:C.muted,fontWeight:600}}>Karma</div>
             </div>
-            <div style={{background:glassCard,borderRadius:'20px',padding:'12px 18px',flex:1,border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
+            <div style={{background:C.surface,borderRadius:'14px',padding:'12px 18px',flex:1,border:`1px solid ${C.border}`}}>
               <div style={{display:'flex',alignItems:'center',gap:'5px',marginBottom:'3px'}}>
                 <span style={{fontSize:'1rem'}}>🏆</span>
                 <span style={{fontWeight:900,fontSize:'1.3rem',color:C.text}}>#{userRank||'—'}</span>
@@ -1882,12 +1687,10 @@ export default function App() {
           <div className={profRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:profRefreshing?undefined:`rotate(${profPullY*4}deg)`,transition:profRefreshing?'none':'transform 0.1s'}}/>
         </div>
         {/* Tabs */}
-        <div style={{display:'flex',padding:'12px 16px',position:'sticky',top:0,background:resolved==='light'?'rgba(255,255,255,0.7)':'rgba(15,15,19,0.72)',backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',zIndex:50}}>
-          <div style={{display:'flex',width:'100%',padding:'4px',borderRadius:'18px',background:glassCard,border:`1px solid ${softBorder}`,boxShadow:elevatedShadow}}>
+        <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:50}}>
           {['Posts','Comments','Saved'].map((t,i)=>(
-            <div key={t} style={{flex:1,padding:'11px 10px',textAlign:'center',fontSize:'0.9rem',fontWeight:i===0?900:800,color:i===0?'white':C.muted,background:i===0?coolGradient:'transparent',borderRadius:'14px',cursor:'pointer',transition:'color 0.15s'}}>{t}</div>
+            <div key={t} style={{flex:1,padding:'12px 10px',textAlign:'center',fontSize:'0.92rem',fontWeight:i===0?800:600,color:i===0?C.text:C.muted,borderBottom:i===0?`2.5px solid ${C.text}`:'2.5px solid transparent',cursor:'pointer',transition:'color 0.15s'}}>{t}</div>
           ))}
-          </div>
         </div>
         {posts.filter(p=>p.user_id===profile.id).map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
         {posts.every(p=>p.user_id!==profile.id)&&(
@@ -1897,7 +1700,7 @@ export default function App() {
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
-        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:accentGradient,color:'white',border:'none',borderRadius:'999px',padding:'14px 20px',fontWeight:900,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 18px 36px rgba(132,94,247,0.28)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
+        <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
         </button>
@@ -1907,7 +1710,7 @@ export default function App() {
       {showPostMenu&&<div onClick={()=>setShowPostMenu(null)} style={{position:'fixed',inset:0,zIndex:199}}/>}
 
       {/* ─── BOTTOM NAV ─── */}
-      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:resolved==='light'?'rgba(255,255,255,0.78)':'rgba(15,15,19,0.82)',borderTop:`1px solid ${softBorder}`,display:'flex',zIndex:200,paddingBottom:`calc(28px + env(safe-area-inset-bottom, 0px))`,backdropFilter:'blur(22px) saturate(180%)',WebkitBackdropFilter:'blur(22px) saturate(180%)',boxShadow:'0 -18px 40px rgba(0,0,0,0.08)'}}>
+      <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(34px + env(safe-area-inset-bottom, 0px))`}}>
         {[
           {id:'feed',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>},
           {id:'messages',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,badge:unread},
@@ -1915,8 +1718,8 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'14px 0 6px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
-            <div style={{position:'relative',padding:'10px',borderRadius:'18px',background:page===n.id?(resolved==='light'?'rgba(132,94,247,0.12)':'rgba(132,94,247,0.16)'):'transparent'}}>
+          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px 0 8px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+            <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
             </div>
