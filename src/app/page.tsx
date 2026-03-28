@@ -32,7 +32,6 @@ const DARK =  { bg:'#0f0f13', surface:'#18181f', surface2:'#222230', border:'#2e
 const ANON_EMOJIS = ['🦊','🐧','🎩','🦄','🌈','🔮','🎪','🦋','🌊','🎭','🐻','🦁']
 const AV_COLORS = ['#1a3a5c','#2563eb','#7c3aed','#0891b2','#15803d','#b45309','#be123c','#0f766e']
 const AV_LOGOS = ['/av1.jpg','/av2.jpg','/av3.jpg']
-const SCHOOLS = ['北京大学','清华大学','复旦大学','上海交通大学','浙江大学','南京大学','武汉大学','中山大学','华中科技大学','四川大学']
 
 function ago(ts: string) {
   const d = Date.now() - new Date(ts).getTime()
@@ -60,7 +59,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null)
   const [profile, setProfile] = useState<Profile|null>(null)
   const [authTab, setAuthTab] = useState<'login'|'register'>('login')
-  const [af, setAf] = useState({ email:'', pwd:'', username:'', school: SCHOOLS[0] })
+  const [af, setAf] = useState({ email:'', pwd:'', username:'' })
   const [authLoading, setAuthLoading] = useState(false)
   const [authErr, setAuthErr] = useState('')
 
@@ -181,6 +180,9 @@ export default function App() {
   const mktMyViewRef = useRef<HTMLDivElement>(null)
   const mktMyViewOpenRef = useRef<null|'saved'|'mine'>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showActivity, setShowActivity] = useState(false)
+  const activityRef = useRef<HTMLDivElement>(null)
+  const activityBackdropRef = useRef<HTMLDivElement>(null)
   const [searchOverlay, setSearchOverlay] = useState(false)
   const searchOverlayRef = useRef<HTMLDivElement>(null)
   const searchBackdropRef = useRef<HTMLDivElement>(null)
@@ -242,7 +244,7 @@ export default function App() {
     setAuthLoading(true); setAuthErr('')
     if (!af.username||!af.email||!af.pwd) { setAuthErr('请填写所有字段'); setAuthLoading(false); return }
     if (af.pwd.length < 6) { setAuthErr('密码至少6位'); setAuthLoading(false); return }
-    const { error } = await sb.auth.signUp({ email: af.email, password: af.pwd, options: { data: { username: af.username, school: af.school, avatar_initials: af.username.slice(0,2).toUpperCase(), avatar_color: AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)] } } })
+    const { error } = await sb.auth.signUp({ email: af.email, password: af.pwd, options: { data: { username: af.username, avatar_initials: af.username.slice(0,2).toUpperCase(), avatar_color: AV_COLORS[Math.floor(Math.random()*AV_COLORS.length)] } } })
     if (error) setAuthErr(error.message); else setAuthErr('注册成功！请查收验证邮件后登录')
     setAuthLoading(false)
   }
@@ -357,15 +359,24 @@ export default function App() {
   async function submitListing() {
     if (!profile||!lf.title) return
     setLUploading(true)
-    const urls: string[] = []
-    for (const file of lFiles) {
-      const path = `${profile.id}/${Date.now()}_${file.name}`
-      const { error } = await sb.storage.from('listing-images').upload(path,file,{upsert:true})
-      if (!error) { const { data: u } = sb.storage.from('listing-images').getPublicUrl(path); urls.push(u.publicUrl) }
-    }
-    await sb.from('listings').insert({user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,category:lf.cat,description:lf.desc,condition:lf.condition,emoji:'📦',school:profile.school,images:urls})
-    setShowListing(false); setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null)
-    setLUploading(false); loadListings()
+    try {
+      const urls: string[] = []
+      for (const file of lFiles) {
+        const path = `${profile.id}/${Date.now()}_${file.name}`
+        const { error } = await sb.storage.from('listing-images').upload(path,file,{upsert:true})
+        if (!error) { const { data: u } = sb.storage.from('listing-images').getPublicUrl(path); urls.push(u.publicUrl) }
+      }
+      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',images:urls}
+      if (lf.cat) ins.category = lf.cat
+      if (lf.desc) ins.description = lf.desc
+      if (lf.condition) ins.condition = lf.condition
+      if (profile.school) ins.school = profile.school
+      const { error: insertErr } = await sb.from('listings').insert(ins)
+      if (insertErr) { console.error('Listing insert error:', insertErr); setLUploading(false); return }
+      setShowListing(false); setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null)
+      loadListings()
+    } catch(e) { console.error('submitListing error:', e) }
+    setLUploading(false)
   }
 
   async function openPost(p:Post){
@@ -576,14 +587,14 @@ export default function App() {
   function closeDetail() {
     if (postDetailRef.current) {
       postDetailRef.current.style.animation = 'none'
-      postDetailRef.current.style.transition = 'transform 0.28s ease'
+      postDetailRef.current.style.transition = 'transform 0.38s ease'
       postDetailRef.current.style.transform = 'translateX(100%)'
     }
     if (detailBackdropRef.current) {
-      detailBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      detailBackdropRef.current.style.transition = 'opacity 0.38s ease'
       detailBackdropRef.current.style.opacity = '0'
     }
-    setTimeout(() => setSelectedPost(null), 290)
+    setTimeout(() => setSelectedPost(null), 400)
   }
   function closeListing() {
     setListingClosing(true)
@@ -591,36 +602,47 @@ export default function App() {
   }
   function closeChat() {
     if (chatDetailRef.current) {
-      chatDetailRef.current.style.transition = 'transform 0.28s ease'
+      chatDetailRef.current.style.transition = 'transform 0.38s ease'
       chatDetailRef.current.style.transform = 'translateX(100%)'
     }
     if (chatBackdropRef.current) {
-      chatBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      chatBackdropRef.current.style.transition = 'opacity 0.38s ease'
       chatBackdropRef.current.style.opacity = '0'
     }
-    setTimeout(() => setChatTarget(null), 290)
+    setTimeout(() => setChatTarget(null), 400)
   }
   function closeListingDetail() {
     if (listingDetailRef.current) {
-      listingDetailRef.current.style.transition = 'transform 0.28s ease'
+      listingDetailRef.current.style.transition = 'transform 0.38s ease'
       listingDetailRef.current.style.transform = 'translateX(100%)'
     }
     if (listingBackdropRef.current) {
-      listingBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      listingBackdropRef.current.style.transition = 'opacity 0.38s ease'
       listingBackdropRef.current.style.opacity = '0'
     }
-    setTimeout(() => setSelectedListing(null), 290)
+    setTimeout(() => setSelectedListing(null), 400)
   }
   function closeSearchOverlay() {
     if (searchOverlayRef.current) {
-      searchOverlayRef.current.style.transition = 'transform 0.28s ease'
+      searchOverlayRef.current.style.transition = 'transform 0.38s ease'
       searchOverlayRef.current.style.transform = 'translateX(100%)'
     }
     if (searchBackdropRef.current) {
-      searchBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      searchBackdropRef.current.style.transition = 'opacity 0.38s ease'
       searchBackdropRef.current.style.opacity = '0'
     }
-    setTimeout(() => setSearchOverlay(false), 290)
+    setTimeout(() => setSearchOverlay(false), 400)
+  }
+  function closeActivity() {
+    if (activityRef.current) {
+      activityRef.current.style.transition = 'transform 0.38s ease'
+      activityRef.current.style.transform = 'translateX(100%)'
+    }
+    if (activityBackdropRef.current) {
+      activityBackdropRef.current.style.transition = 'opacity 0.38s ease'
+      activityBackdropRef.current.style.opacity = '0'
+    }
+    setTimeout(() => setShowActivity(false), 400)
   }
   function closeRepost() {
     setRepostClosing(true)
@@ -677,6 +699,8 @@ export default function App() {
   profPullYRef.current = profPullY
   srchPullYRef.current = srchPullY
   searchOverlayOpenRef.current = searchOverlay
+  const showActivityRef = useRef(false)
+  showActivityRef.current = showActivity
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -696,6 +720,23 @@ export default function App() {
       }
       // Bottom sheet open: let the sheet handle its own drag, don't touch background
       if (showPostRef.current || showRepostRef.current) return
+      // Activity page: swipe-back
+      if (showActivityRef.current && activityRef.current) {
+        if (dx > 8) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0) {
+          if (e.cancelable) e.preventDefault()
+          swipeXRef.current = dx
+          activityRef.current.style.animation = 'none'
+          activityRef.current.style.transition = 'none'
+          activityRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          if (activityBackdropRef.current) {
+            activityBackdropRef.current.style.animation = 'none'
+            activityBackdropRef.current.style.transition = 'none'
+            activityBackdropRef.current.style.opacity = String(Math.max(0, 1 - dx / window.innerWidth))
+          }
+        }
+        return
+      }
       // Post detail open: swipe-back (right). Override lock if clearly going right.
       if (selectedPostRef.current) {
         if (dx > 8) swipeLocked.current = 'h'
@@ -818,14 +859,31 @@ export default function App() {
     async function onTE() {
       if (touchOnCarousel) { touchOnCarousel = false; swipeLocked.current = null; swipeXRef.current = 0; return }
       if (showPostRef.current || showRepostRef.current) { swipeLocked.current = null; swipeXRef.current = 0; return }
+      // Activity page: complete swipe-back or snap back
+      if (showActivityRef.current && activityRef.current) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          activityRef.current.style.animation = 'none'
+          activityRef.current.style.transition = 'transform 0.38s ease'
+          activityRef.current.style.transform = 'translateX(100%)'
+          if (activityBackdropRef.current) { activityBackdropRef.current.style.transition = 'opacity 0.38s ease'; activityBackdropRef.current.style.opacity = '0' }
+          setTimeout(() => setShowActivity(false), 400)
+        } else {
+          activityRef.current.style.animation = 'none'
+          activityRef.current.style.transition = 'transform 0.25s ease'
+          activityRef.current.style.transform = 'translateX(0)'
+          if (activityBackdropRef.current) { activityBackdropRef.current.style.transition = 'opacity 0.25s ease'; activityBackdropRef.current.style.opacity = '1' }
+          setTimeout(() => { if (activityRef.current) activityRef.current.style.transition = ''; if (activityBackdropRef.current) activityBackdropRef.current.style.transition = '' }, 260)
+        }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
       // Chat detail: complete swipe-back or snap back
       if (chatDetailRef.current && chatTargetRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           chatDetailRef.current.style.animation = 'none'
-          chatDetailRef.current.style.transition = 'transform 0.28s ease'
+          chatDetailRef.current.style.transition = 'transform 0.38s ease'
           chatDetailRef.current.style.transform = 'translateX(100%)'
-          if (chatBackdropRef.current) { chatBackdropRef.current.style.transition = 'opacity 0.28s ease'; chatBackdropRef.current.style.opacity = '0' }
-          setTimeout(() => setChatTarget(null), 290)
+          if (chatBackdropRef.current) { chatBackdropRef.current.style.transition = 'opacity 0.38s ease'; chatBackdropRef.current.style.opacity = '0' }
+          setTimeout(() => setChatTarget(null), 400)
         } else {
           chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'transform 0.25s ease'
@@ -840,14 +898,14 @@ export default function App() {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           if (postDetailRef.current) {
             postDetailRef.current.style.animation = 'none'
-            postDetailRef.current.style.transition = 'transform 0.28s ease'
+            postDetailRef.current.style.transition = 'transform 0.38s ease'
             postDetailRef.current.style.transform = 'translateX(100%)'
           }
           if (detailBackdropRef.current) {
-            detailBackdropRef.current.style.transition = 'opacity 0.28s ease'
+            detailBackdropRef.current.style.transition = 'opacity 0.38s ease'
             detailBackdropRef.current.style.opacity = '0'
           }
-          setTimeout(() => setSelectedPost(null), 290)
+          setTimeout(() => setSelectedPost(null), 400)
         } else if (postDetailRef.current) {
           postDetailRef.current.style.animation = 'none'
           postDetailRef.current.style.transition = 'transform 0.25s ease'
@@ -867,9 +925,9 @@ export default function App() {
       if (mktMyViewOpenRef.current && mktMyViewRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           mktMyViewRef.current.style.animation = 'none'
-          mktMyViewRef.current.style.transition = 'transform 0.28s ease'
+          mktMyViewRef.current.style.transition = 'transform 0.38s ease'
           mktMyViewRef.current.style.transform = 'translateX(100%)'
-          if (mktMyViewBackdropRef.current) { mktMyViewBackdropRef.current.style.transition = 'opacity 0.28s ease'; mktMyViewBackdropRef.current.style.opacity = '0' }
+          if (mktMyViewBackdropRef.current) { mktMyViewBackdropRef.current.style.transition = 'opacity 0.38s ease'; mktMyViewBackdropRef.current.style.opacity = '0' }
           setTimeout(() => setMktMyView(null), 290)
         } else {
           mktMyViewRef.current.style.animation = 'none'
@@ -884,10 +942,10 @@ export default function App() {
       if (searchOverlayOpenRef.current && searchOverlayRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           searchOverlayRef.current.style.animation = 'none'
-          searchOverlayRef.current.style.transition = 'transform 0.28s ease'
+          searchOverlayRef.current.style.transition = 'transform 0.38s ease'
           searchOverlayRef.current.style.transform = 'translateX(100%)'
-          if (searchBackdropRef.current) { searchBackdropRef.current.style.transition = 'opacity 0.28s ease'; searchBackdropRef.current.style.opacity = '0' }
-          setTimeout(() => setSearchOverlay(false), 290)
+          if (searchBackdropRef.current) { searchBackdropRef.current.style.transition = 'opacity 0.38s ease'; searchBackdropRef.current.style.opacity = '0' }
+          setTimeout(() => setSearchOverlay(false), 400)
         } else {
           searchOverlayRef.current.style.animation = 'none'
           searchOverlayRef.current.style.transition = 'transform 0.25s ease'
@@ -902,11 +960,11 @@ export default function App() {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           if (listingDetailRef.current) {
             listingDetailRef.current.style.animation = 'none'
-            listingDetailRef.current.style.transition = 'transform 0.28s ease'
+            listingDetailRef.current.style.transition = 'transform 0.38s ease'
             listingDetailRef.current.style.transform = 'translateX(100%)'
           }
-          if (listingBackdropRef.current) { listingBackdropRef.current.style.transition = 'opacity 0.28s ease'; listingBackdropRef.current.style.opacity = '0' }
-          setTimeout(() => setSelectedListing(null), 290)
+          if (listingBackdropRef.current) { listingBackdropRef.current.style.transition = 'opacity 0.38s ease'; listingBackdropRef.current.style.opacity = '0' }
+          setTimeout(() => setSelectedListing(null), 400)
         } else {
           if (listingDetailRef.current) {
             listingDetailRef.current.style.animation = 'none'
@@ -1084,17 +1142,17 @@ export default function App() {
             <div style={{position:'relative',marginLeft:'auto'}}>
               <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
               {showPostMenu===p.id&&(
-                <div style={{position:'absolute',right:0,bottom:'30px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 24px ${C.shadow}`}}>
+                <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.92)':'rgba(40,40,55,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.12)':'rgba(0,0,0,0.4)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
                   <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
                     <span>🚨</span> Report
                   </button>
                   {p.user_id===profile!.id&&(
-                    <button onClick={()=>{deletePst(p.id);setShowPostMenu(null)}} style={{width:'100%',padding:'13px 16px',background:'none',border:`1px solid ${C.border}`,borderTop:`1px solid ${C.border}`,borderLeft:'none',borderRight:'none',borderBottom:'none',cursor:'pointer',color:C.red,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                    <button onClick={()=>{deletePst(p.id);setShowPostMenu(null)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.08)'}`,cursor:'pointer',color:C.red,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
                       <span>🗑️</span> Delete
                     </button>
                   )}
                   {p.user_id!==profile!.id&&(
-                    <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:`1px solid ${C.border}`,borderTop:`1px solid ${C.border}`,borderLeft:'none',borderRight:'none',borderBottom:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                    <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.08)'}`,cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
                       <span>🚫</span> Block this user
                     </button>
                   )}
@@ -1126,13 +1184,13 @@ export default function App() {
           )}
         </div>
         {/* vote col */}
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',minWidth:'30px'}}>
-          <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'2px'}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+        <div onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'44px',padding:'4px 0'}}>
+          <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'6px'}}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.2"><polyline points="18 15 12 9 6 15"/></svg>
           </button>
-          <span style={{fontWeight:700,fontSize:'0.95rem',color:score>0?C.upvote:score<0?C.red:C.muted}}>{score}</span>
-          <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'2px'}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+          <span style={{fontWeight:800,fontSize:'1.1rem',color:score>0?C.upvote:score<0?C.red:C.muted}}>{score}</span>
+          <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'6px'}}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
         </div>
       </div>
@@ -1155,12 +1213,6 @@ export default function App() {
           <div style={{marginBottom:'12px'}}>
             <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'.5px'}}>昵称</label>
             <input style={inp} placeholder="你的名字" value={af.username} onChange={e=>setAf(f=>({...f,username:e.target.value}))} />
-          </div>
-          <div style={{marginBottom:'12px'}}>
-            <label style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,display:'block',marginBottom:'5px',textTransform:'uppercase',letterSpacing:'.5px'}}>学校</label>
-            <select style={{...inp,cursor:'pointer'}} value={af.school} onChange={e=>setAf(f=>({...f,school:e.target.value}))}>
-              {SCHOOLS.map(s=><option key={s}>{s}</option>)}
-            </select>
           </div>
         </>}
         <div style={{marginBottom:'12px'}}>
@@ -1212,14 +1264,10 @@ export default function App() {
       {/* ─── FEED ─── */}
       {page==='feed' && <div className="feed-swipe">
         {topBar(
-          <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>{profile.school}</span></>,
-          <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
-            <span style={{fontSize:'0.78rem',color:C.green,fontWeight:700,display:'flex',alignItems:'center',gap:'4px'}}>
-              <span style={{width:'7px',height:'7px',borderRadius:'50%',background:C.green,display:'inline-block'}}/>
-              {online} online
-            </span>
-            <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',padding:0}}>⚙️</button>
-          </div>,
+          <><img src="/logo-main.jpg" alt="" style={{width:'30px',height:'30px',borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${C.border}`}}/><span style={{fontWeight:800,fontSize:'1rem'}}>Heha</span></>,
+          <button onClick={()=>setShowActivity(true)} style={{background:'none',border:'none',cursor:'pointer',padding:'4px',display:'flex',alignItems:'center'}}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          </button>,
           true
         )}
         <div style={{background:C.bg,position:'sticky',top:'53px',zIndex:99,borderBottom:`1px solid ${C.border}`}}>
@@ -1312,9 +1360,13 @@ export default function App() {
               })}
               {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
             </div>
-            <div style={{display:'flex',gap:'8px',padding:'12px 16px',borderTop:`1px solid ${C.border}`,paddingBottom:'calc(12px + env(safe-area-inset-bottom))'}}>
-              <input style={{...inp,fontSize:'0.9rem',flex:1}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
-              <button onClick={sendMsg} style={{padding:'10px 16px',background:C.accentBright,color:'white',border:'none',borderRadius:'12px',fontWeight:700,cursor:'pointer'}}>发</button>
+            <div style={{padding:'10px 12px',paddingBottom:'calc(10px + env(safe-area-inset-bottom))'}}>
+              <div style={{display:'flex',gap:'8px',alignItems:'center',background:resolved==='light'?'rgba(240,240,240,0.85)':'rgba(255,255,255,0.08)',backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',borderRadius:'24px',padding:'6px 6px 6px 16px'}}>
+                <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
+                <button onClick={sendMsg} style={{width:'36px',height:'36px',borderRadius:'50%',background:C.accentBright,color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
             </div>
           </div>
         </>)}
@@ -2057,7 +2109,6 @@ export default function App() {
               <div style={{width:'46px',height:'46px',borderRadius:'50%',background:profile.avatar_color,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'white',fontSize:'0.95rem'}}>{profile.avatar_initials}</div>
               <div>
                 <div style={{fontWeight:700}}>{profile.username}</div>
-                <div style={{fontSize:'0.85rem',color:C.muted}}>{profile.school}</div>
               </div>
             </div>
             <button onClick={()=>sb.auth.signOut()} style={{width:'100%',padding:'14px',background:'transparent',border:`1px solid ${C.red}`,borderRadius:'14px',color:C.red,fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
@@ -2066,6 +2117,37 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ─── ACTIVITY PAGE ─── */}
+      {showActivity&&(<>
+        <div ref={activityBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:449,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
+        <div ref={activityRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:450,background:C.bg,display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,background:C.bg}}>
+            <button onClick={closeActivity} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
+            <span style={{fontWeight:800,fontSize:'1.05rem'}}>Activity</span>
+          </div>
+          <div style={{flex:1,overflowY:'auto',padding:'0'}}>
+            {/* System notifications */}
+            {[
+              {icon:'🎉',title:'Welcome to Heha!',desc:'Start posting and connect with your community anonymously.',time:'Just now',color:C.accentBright},
+              {icon:'📢',title:'Community Guidelines',desc:'Be respectful, stay anonymous, and have fun. Report any inappropriate content.',time:'1h',color:C.green},
+              {icon:'🔔',title:'Stay Updated',desc:'Turn on notifications to never miss what\'s happening around you.',time:'2h',color:'#f59e0b'},
+            ].map((n,i)=>(
+              <div key={i} style={{display:'flex',gap:'14px',padding:'16px 20px',borderBottom:`1px solid ${C.border}`,alignItems:'flex-start'}}>
+                <div style={{width:'42px',height:'42px',borderRadius:'50%',background:resolved==='light'?'#f0f0f0':C.surface2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.2rem',flexShrink:0}}>{n.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:'0.95rem',color:C.text,marginBottom:'3px'}}>{n.title}</div>
+                  <div style={{fontSize:'0.88rem',color:C.muted,lineHeight:'1.4'}}>{n.desc}</div>
+                  <div style={{fontSize:'0.78rem',color:C.muted,marginTop:'6px'}}>{n.time}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{textAlign:'center',padding:'40px 20px',color:C.muted,fontSize:'0.88rem'}}>
+              That's all for now
+            </div>
+          </div>
+        </div>
+      </>)}
 
       {selectedPost&&(<>
         <div ref={detailBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
@@ -2264,17 +2346,22 @@ export default function App() {
 
       {showDm&&dmTarget&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:500,display:'flex',flexDirection:'column' as const,justifyContent:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowDm(false)}>
-          <div style={{background:C.bg,borderRadius:'20px 20px 0 0',padding:'20px 16px'}}>
+          <div className="slide-up" style={{background:resolved==='light'?'rgba(255,255,255,0.88)':'rgba(30,30,40,0.88)',backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderRadius:'20px 20px 0 0',padding:'20px 16px',paddingBottom:'calc(16px + env(safe-area-inset-bottom))'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
               <button onClick={()=>{setShowDm(false);setDmMsg('')}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontFamily:'inherit'}}>Cancel</button>
               <div style={{fontWeight:700}}>Send Message</div>
               <button onClick={sendDm} disabled={!dmMsg.trim()} style={{background:C.accentBright,color:'white',border:'none',borderRadius:'20px',padding:'7px 18px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!dmMsg.trim()?.5:1}}>Send</button>
             </div>
-            <div style={{background:C.surface,borderRadius:'12px',padding:'12px',marginBottom:'14px',borderLeft:'3px solid '+C.accentBright}}>
+            <div style={{background:resolved==='light'?'rgba(0,0,0,0.04)':'rgba(255,255,255,0.06)',borderRadius:'12px',padding:'12px',marginBottom:'14px',borderLeft:'3px solid '+C.accentBright}}>
               <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'4px'}}>To: {dmTarget.is_anon?'Anonymous':(dmTarget.profiles?.username||'User')}</div>
               <div style={{fontSize:'0.9rem'}}>{dmTarget.text?.slice(0,100)}</div>
             </div>
-            <textarea style={{width:'100%',background:C.surface,border:'1px solid '+C.border,borderRadius:'12px',padding:'12px',color:C.text,fontFamily:'inherit',fontSize:'0.95rem',outline:'none',minHeight:'80px',resize:'none' as const,lineHeight:'1.5'}} placeholder="Write a message..." value={dmMsg} onChange={e=>setDmMsg(e.target.value)} autoFocus />
+            <div style={{background:resolved==='light'?'rgba(240,240,240,0.8)':'rgba(255,255,255,0.06)',borderRadius:'20px',padding:'4px 4px 4px 16px',display:'flex',alignItems:'flex-end',gap:'8px'}}>
+              <textarea style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontFamily:'inherit',fontSize:'0.95rem',minHeight:'36px',maxHeight:'120px',resize:'none' as const,lineHeight:'1.5',padding:'8px 0'}} placeholder="Write a message..." value={dmMsg} onChange={e=>setDmMsg(e.target.value)} autoFocus />
+              <button onClick={sendDm} disabled={!dmMsg.trim()} style={{width:'36px',height:'36px',borderRadius:'50%',background:dmMsg.trim()?C.accentBright:(resolved==='light'?'#ddd':'#444'),color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginBottom:'2px'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
           </div>
         </div>
       )}

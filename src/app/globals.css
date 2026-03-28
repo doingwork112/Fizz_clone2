@@ -56,13 +56,13 @@ body.modal-open {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
 }
-.slide-up { animation: slideUp 0.32s cubic-bezier(0.32,0.72,0,1) forwards; }
+.slide-up { animation: slideUp 0.42s cubic-bezier(0.32,0.72,0,1) forwards; }
 
 @keyframes slideDown {
   from { transform: translateY(0); opacity: 1; }
   to   { transform: translateY(100%); opacity: 0.8; }
 }
-.slide-down { animation: slideDown 0.35s cubic-bezier(0.4,0,0.6,1) forwards; }
+.slide-down { animation: slideDown 0.42s cubic-bezier(0.4,0,0.6,1) forwards; }
 
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -85,13 +85,13 @@ body.modal-open {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
-.slide-in-right { animation: slideInRight 0.38s cubic-bezier(0.32,0.72,0,1) both; }
+.slide-in-right { animation: slideInRight 0.48s cubic-bezier(0.32,0.72,0,1) both; }
 
 @keyframes slideOutRight {
   from { transform: translateX(0); }
   to   { transform: translateX(100%); }
 }
-.slide-out-right { animation: slideOutRight 0.28s cubic-bezier(0.4,0,0.6,1) forwards; }
+.slide-out-right { animation: slideOutRight 0.38s cubic-bezier(0.4,0,0.6,1) forwards; }
 
 .font-fizz { font-family: 'Nunito', sans-serif; }
 
@@ -168,6 +168,11 @@ body.modal-open {
 }
 
 /* Poll */
+@keyframes bubblePop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
 .poll-bar {
   position: absolute;
   left: 0; top: 0; bottom: 0;
