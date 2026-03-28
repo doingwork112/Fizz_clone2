@@ -369,9 +369,10 @@ export default function App() {
         const { error } = await sb.storage.from('listing-images').upload(path,file,{upsert:true})
         if (!error) { const { data: u } = sb.storage.from('listing-images').getPublicUrl(path); urls.push(u.publicUrl) }
       }
-      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',images:urls,category:lf.cat||'Other',description:lf.desc||'',condition:lf.condition||'Good',school:profile.school||'Heha'}
+      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',category:lf.cat||'Other',description:lf.desc||'',condition:lf.condition||'Good',school:profile.school||'Heha'}
+      if (urls.length > 0) ins.images = urls
       const { error: insertErr } = await sb.from('listings').insert(ins)
-      if (insertErr) { console.error('Listing insert error:', insertErr); setLUploading(false); return }
+      if (insertErr) { console.error('Listing insert error:', insertErr); alert('发布失败: ' + insertErr.message); setLUploading(false); return }
       setLUploading(false)
       setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null)
       // Show "已发布" confirmation then navigate to marketplace
@@ -581,9 +582,11 @@ export default function App() {
   }
 
   function openPostModal() {
+    lockBody()
     setShowPost(true)
   }
   function closePost() {
+    unlockBody()
     setPostClosing(true)
     setPostDragY(0)
     setTimeout(()=>{ setShowPost(false); setPostClosing(false); setPostText(''); setPostImgs([]); setPostPrevs([]); setPostTag(''); setShowTagPicker(false) }, 350)
@@ -727,7 +730,7 @@ export default function App() {
       if (showPostRef.current || showRepostRef.current) return
       // Activity page: swipe-back
       if (showActivityRef.current && activityRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40 && swipeLocked.current !== 'v') swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -742,9 +745,9 @@ export default function App() {
         }
         return
       }
-      // Post detail open: swipe-back (right). Override lock if clearly going right.
+      // Post detail open: swipe-back (right). Only from left edge, not during vertical scroll.
       if (selectedPostRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40 && swipeLocked.current !== 'v') swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -761,9 +764,9 @@ export default function App() {
         }
         return
       }
-      // Chat detail open: swipe-back only from left edge (40px), ignore if vertical scroll detected
+      // Chat detail open: swipe-back only from left edge, not during vertical scroll
       if (chatDetailRef.current && chatTargetRef.current) {
-        if (dx > 12 && sx < 40) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40 && swipeLocked.current !== 'v') swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -780,7 +783,7 @@ export default function App() {
       }
       // My Saved / My Listings overlay: swipe-back
       if (mktMyViewOpenRef.current && mktMyViewRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40 && swipeLocked.current !== 'v') swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -797,7 +800,7 @@ export default function App() {
       }
       // Listing detail open: swipe-back (right)
       if (selectedListingRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40 && swipeLocked.current !== 'v') swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -816,7 +819,7 @@ export default function App() {
       }
       // Search results overlay: swipe-back
       if (searchOverlayOpenRef.current && searchOverlayRef.current) {
-        if (dx > 8) swipeLocked.current = 'h'
+        if (dx > 12 && sx < 40 && swipeLocked.current !== 'v') swipeLocked.current = 'h'
         if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
@@ -1147,7 +1150,7 @@ export default function App() {
             <div style={{position:'relative',marginLeft:'auto'}}>
               <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
               {showPostMenu===p.id&&(
-                <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.65)':'rgba(50,50,70,0.55)',backdropFilter:'blur(28px) saturate(180%)',WebkitBackdropFilter:'blur(28px) saturate(180%)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
+                <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.45)':'rgba(40,40,60,0.4)',backdropFilter:'blur(40px) saturate(200%)',WebkitBackdropFilter:'blur(40px) saturate(200%)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
                   <button onClick={()=>setShowPostMenu(null)} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
                     <span>🚨</span> Report
                   </button>
@@ -1365,7 +1368,7 @@ export default function App() {
               })}
               {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
             </div>
-            <div style={{padding:'10px 12px',paddingBottom:'calc(10px + env(safe-area-inset-bottom))',flexShrink:0,background:C.bg,zIndex:10}}>
+            <div style={{padding:'10px 12px',paddingBottom:'calc(44px + env(safe-area-inset-bottom))',flexShrink:0,background:C.bg,zIndex:10,borderTop:`1px solid ${C.border}`}}>
               <div style={{display:'flex',gap:'8px',alignItems:'center',background:resolved==='light'?'rgba(240,240,240,0.85)':'rgba(255,255,255,0.08)',backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',borderRadius:'24px',padding:'6px 6px 6px 16px'}}>
                 <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
                 <button onClick={sendMsg} style={{width:'36px',height:'36px',borderRadius:'50%',background:C.accentBright,color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1637,7 +1640,7 @@ export default function App() {
                   <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>Any Condition</span>
                   <span style={{fontWeight:400,fontSize:'0.87rem',color:C.muted}}>Show all listings regardless of condition.</span>
                 </button>
-                {[{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
+                {[{label:'Brand New',desc:'Sealed or unused, with original packaging.'},{label:'Like New',desc:'Barely used, no visible wear or flaws.'},{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Fair',desc:'Moderate wear, minor cosmetic flaws, works fine.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
                   <button key={label} onClick={()=>{setMktCondFilter(label);setShowCondSheet(false)}} style={{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'4px',padding:'18px',borderRadius:'14px',background:mktCondFilter===label?(resolved==='dark'?'rgba(37,99,235,.15)':'#eff6ff'):resolved==='light'?'#f5f5f7':C.surface,border:mktCondFilter===label?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
                     <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>{label}</span>
                     <span style={{fontWeight:400,fontSize:'0.87rem',color:C.muted}}>{desc}</span>
@@ -1760,6 +1763,7 @@ export default function App() {
                     postSheetRef.current.style.transition='transform 0.3s ease'
                     postSheetRef.current.style.transform='translateY(100%)'
                   }
+                  unlockBody()
                   setTimeout(()=>{setShowPost(false);setPostText('');setPostImgs([]);setPostPrevs([]);setPostTag('');setShowTagPicker(false)},300)
                 } else if(postSheetRef.current){
                   postSheetRef.current.style.transition='transform 0.3s cubic-bezier(0.32,0.72,0,1)'
@@ -1871,7 +1875,7 @@ export default function App() {
                 <span style={{fontWeight:800,fontSize:'1.1rem',color:C.text}}>Select Condition</span>
               </div>
               <div style={{flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
-                {[{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
+                {[{label:'Brand New',desc:'Sealed or unused, with original packaging.'},{label:'Like New',desc:'Barely used, no visible wear or flaws.'},{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Fair',desc:'Moderate wear, minor cosmetic flaws, works fine.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
                   <button key={label} onClick={()=>{setLf(f=>({...f,condition:label}));setListingView(null)}} style={{display:'flex',flexDirection:'column' as const,alignItems:'flex-start',gap:'4px',padding:'18px',borderRadius:'14px',background:resolved==='light'?'#f5f5f7':C.surface,border:lf.condition===label?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left' as const,width:'100%'}}>
                     <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>{label}</span>
                     <span style={{fontWeight:400,fontSize:'0.87rem',color:C.muted}}>{desc}</span>
