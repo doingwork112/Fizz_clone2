@@ -505,6 +505,7 @@ export default function App() {
     setUnread(count||0)
   }
   async function openChat(u:Profile) {
+    lockBody()
     setChatTarget(u)
     const { data } = await sb.from('messages').select('*').or(`and(from_user_id.eq.${profile!.id},to_user_id.eq.${u.id}),and(from_user_id.eq.${u.id},to_user_id.eq.${profile!.id})`).order('created_at')
     setChatMsgs(data||[])
@@ -608,6 +609,7 @@ export default function App() {
     setTimeout(()=>{ setShowListing(false); setListingClosing(false); setLf({title:'',price:'',cat:'',desc:'',condition:''}); setLFiles([]); setLPreviews([]); setListingView(null) }, 340)
   }
   function closeChat() {
+    unlockBody()
     if (chatDetailRef.current) {
       chatDetailRef.current.style.transition = 'transform 0.38s ease'
       chatDetailRef.current.style.transform = 'translateX(100%)'
@@ -887,6 +889,7 @@ export default function App() {
       // Chat detail: complete swipe-back or snap back
       if (chatDetailRef.current && chatTargetRef.current) {
         if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          unlockBody()
           chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'transform 0.38s ease'
           chatDetailRef.current.style.transform = 'translateX(100%)'
@@ -1336,7 +1339,7 @@ export default function App() {
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
         {chatTarget&&(<>
           <div ref={chatBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
-          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column',overflow:'hidden',overscrollBehavior:'contain'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))',background:C.bg,zIndex:10,flexShrink:0}}>
               <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
               <img src={avImg(chatTarget.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
@@ -1348,7 +1351,7 @@ export default function App() {
                 </div>
               )}
             </div>
-            <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:'16px',display:'flex',flexDirection:'column',gap:'10px'}} onClick={()=>{setSelectedMsg(null);setShowChatMenu(false)}}>
+            <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:'16px',display:'flex',flexDirection:'column',gap:'10px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}} onClick={()=>{setSelectedMsg(null);setShowChatMenu(false)}}>
               {chatMsgs.map(m=>{
                 const mine = m.from_user_id===profile.id
                 const canRecall = mine && (Date.now()-new Date(m.created_at).getTime()) < 2*60*1000
@@ -1368,7 +1371,7 @@ export default function App() {
               })}
               {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
             </div>
-            <div style={{padding:'10px 12px',paddingBottom:'calc(44px + env(safe-area-inset-bottom))',flexShrink:0,background:C.bg,zIndex:10,borderTop:`1px solid ${C.border}`}}>
+            <div style={{padding:'10px 12px',paddingBottom:'calc(50px + env(safe-area-inset-bottom))',flexShrink:0,background:C.bg,zIndex:10,borderTop:`1px solid ${C.border}`}}>
               <div style={{display:'flex',gap:'8px',alignItems:'center',background:resolved==='light'?'rgba(240,240,240,0.85)':'rgba(255,255,255,0.08)',backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',borderRadius:'24px',padding:'6px 6px 6px 16px'}}>
                 <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
                 <button onClick={sendMsg} style={{width:'36px',height:'36px',borderRadius:'50%',background:C.accentBright,color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1740,11 +1743,11 @@ export default function App() {
 
       {/* ─── POST MODAL — bottom sheet ─── */}
       {showPost && (<>
-        <div onClick={closePost} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.18)'}}/>
+        <div onClick={closePost} onTouchMove={e=>e.preventDefault()} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.18)'}}/>
         <div
           ref={postSheetRef}
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:showTagPicker?'85vh':'75vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform'}}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:showTagPicker?'85vh':'75vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain'}}
         >
             <div
               style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}
@@ -1805,7 +1808,7 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px'}}>
+              <div style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
                 <textarea
                   style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'80px'}}
                   placeholder="Share what's really on your mind..."
