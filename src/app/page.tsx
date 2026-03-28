@@ -212,9 +212,10 @@ export default function App() {
     const mch = sb.channel('rt-msgs').on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`to_user_id=eq.${profile.id}`},p=>{
       if(chatTargetRef.current?.id===p.new.from_user_id){
         setChatMsgs(x=>[...x,p.new as Message])
-        sb.from('messages').update({is_read:true}).eq('id',p.new.id)
+        sb.from('messages').update({is_read:true}).eq('id',p.new.id).then(()=>{loadConvos();loadUnread()})
+      } else {
+        loadConvos();loadUnread()
       }
-      loadConvos();loadUnread()
     }).subscribe()
     const iv = setInterval(()=>presence(profile),120000)
     return ()=>{ sb.removeChannel(ch); sb.removeChannel(mch); clearInterval(iv) }
@@ -481,7 +482,9 @@ export default function App() {
     const { data } = await sb.from('messages').select('*').or(`and(from_user_id.eq.${profile!.id},to_user_id.eq.${u.id}),and(from_user_id.eq.${u.id},to_user_id.eq.${profile!.id})`).order('created_at')
     setChatMsgs(data||[])
     await sb.from('messages').update({is_read:true}).eq('to_user_id',profile!.id).eq('from_user_id',u.id)
-    loadUnread(); setTimeout(()=>chatRef.current?.scrollTo(0,chatRef.current.scrollHeight),100)
+    loadUnread()
+    setUnread(0) // optimistic clear — DB update confirmed above
+    setTimeout(()=>chatRef.current?.scrollTo(0,chatRef.current.scrollHeight),100)
   }
   async function sendMsg() {
     if (!profile||!chatTarget||!chatInput.trim()) return
@@ -1191,7 +1194,8 @@ export default function App() {
           ))
         })()}
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
-        {chatTarget&&(
+        {chatTarget&&(<>
+          <div className="fade-in" style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
           <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
               <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
@@ -1229,7 +1233,7 @@ export default function App() {
               <button onClick={sendMsg} style={{padding:'10px 16px',background:C.accentBright,color:'white',border:'none',borderRadius:'12px',fontWeight:700,cursor:'pointer'}}>发</button>
             </div>
           </div>
-        )}
+        </>)}
       </>}
 
       {/* ─── SEARCH / DISCOVER ─── */}
@@ -1368,7 +1372,8 @@ export default function App() {
 
 
         {/* ─── MY SAVED / MY LISTINGS OVERLAY ─── */}
-        {mktMyView&&(
+        {mktMyView&&(<>
+          <div className="fade-in" style={{position:'fixed',inset:0,zIndex:449,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
           <div ref={mktMyViewRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:450,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:10}}>
               <button onClick={()=>setMktMyView(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
@@ -1407,7 +1412,7 @@ export default function App() {
               )
             })()}
           </div>
-        )}
+        </>)}
 
         {/* ─── SORT BOTTOM SHEET ─── */}
         {showSortSheet&&(
@@ -1781,7 +1786,8 @@ export default function App() {
       )}
 
       {/* ─── LISTING DETAIL ─── */}
-      {selectedListing&&(
+      {selectedListing&&(<>
+        <div className="fade-in" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:399,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
         <div ref={listingDetailRef} className="slide-in-right" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
           {/* top bar */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
@@ -1790,25 +1796,27 @@ export default function App() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
           </div>
-          {/* image carousel */}
-          {selectedListing.images&&selectedListing.images.length>0 ? (
-            <div style={{position:'relative',width:'100%',aspectRatio:'1',overflow:'hidden'}}>
-              <div style={{display:'flex',height:'100%',transition:'transform 0.25s cubic-bezier(0.4,0,0.2,1)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
-                {selectedListing.images.map((img,i)=>(
-                  <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover'}}/>
-                ))}
-              </div>
-              {selectedListing.images.length>1&&(
-                <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
-                  {selectedListing.images.map((_,i)=>(
-                    <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
+          {/* image carousel — explicit height so it works inside scroll container */}
+          <div style={{padding:'0 16px 12px'}}>
+            {selectedListing.images&&selectedListing.images.length>0 ? (
+              <div style={{position:'relative',width:'100%',height:'300px',borderRadius:'18px',overflow:'hidden',background:C.surface}}>
+                <div style={{display:'flex',height:'100%',transition:'transform 0.25s cubic-bezier(0.4,0,0.2,1)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
+                  {selectedListing.images.map((img,i)=>(
+                    <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover'}}/>
                   ))}
                 </div>
-              )}
-            </div>
-          ) : (
-            <div style={{width:'100%',aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
-          )}
+                {selectedListing.images.length>1&&(
+                  <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
+                    {selectedListing.images.map((_,i)=>(
+                      <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{width:'100%',height:'300px',borderRadius:'18px',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
+            )}
+          </div>
           {/* info */}
           <div style={{padding:'16px 18px 32px'}}>
             <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'4px'}}>
@@ -1871,7 +1879,7 @@ export default function App() {
             )}
           </div>
         </div>
-      )}
+      </>)}
 
       {/* ─── SETTINGS MODAL ─── */}
       {showSettings && (
