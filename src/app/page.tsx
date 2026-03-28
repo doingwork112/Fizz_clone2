@@ -65,7 +65,7 @@ export default function App() {
   const [authErr, setAuthErr] = useState('')
 
   const [page, setPage] = useState<'feed'|'messages'|'search'|'market'|'profile'>('feed')
-  const [feedTab, setFeedTab] = useState<'Top'|"Fizzin'"| 'New'>("Fizzin'")
+  const [feedTab, setFeedTab] = useState<'Top'|'Heha!'|'New'>('Heha!')
 
   const [posts, setPosts] = useState<Post[]>([])
   const [listings, setListings] = useState<Listing[]>([])
@@ -166,6 +166,9 @@ export default function App() {
   const [profPullY, setProfPullY] = useState(0)
   const [profRefreshing, setProfRefreshing] = useState(false)
   const profPullYRef = useRef(0)
+  const [srchPullY, setSrchPullY] = useState(0)
+  const [srchRefreshing, setSrchRefreshing] = useState(false)
+  const srchPullYRef = useRef(0)
   const [msgTab, setMsgTab] = useState<'posts'|'market'>('posts')
   const [mktConvoPartners, setMktConvoPartners] = useState<string[]>(()=>{
     if (typeof window === 'undefined') return []
@@ -206,7 +209,13 @@ export default function App() {
     if (!profile) return
     loadPosts(); loadListings(); loadConvos(); loadUnread()
     const ch = sb.channel('rt-posts').on('postgres_changes',{event:'*',schema:'public',table:'posts'},()=>loadPosts()).subscribe()
-    const mch = sb.channel('rt-msgs').on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`to_user_id=eq.${profile.id}`},p=>{loadConvos();loadUnread();if(chatTarget?.id===p.new.from_user_id)setChatMsgs(x=>[...x,p.new as Message])}).subscribe()
+    const mch = sb.channel('rt-msgs').on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`to_user_id=eq.${profile.id}`},p=>{
+      if(chatTargetRef.current?.id===p.new.from_user_id){
+        setChatMsgs(x=>[...x,p.new as Message])
+        sb.from('messages').update({is_read:true}).eq('id',p.new.id)
+      }
+      loadConvos();loadUnread()
+    }).subscribe()
     const iv = setInterval(()=>presence(profile),120000)
     return ()=>{ sb.removeChannel(ch); sb.removeChannel(mch); clearInterval(iv) }
   }, [profile?.id])
@@ -250,7 +259,7 @@ export default function App() {
   function sorted() {
     const p = [...posts]
     if (feedTab==='Top') return p.sort((a,b)=>b.likes_count-a.likes_count)
-    if (feedTab==="Fizzin'") return p.sort((a,b)=>(b.likes_count-(b.dislikes_count||0))-(a.likes_count-(a.dislikes_count||0)))
+    if (feedTab==='Heha!') return p.sort((a,b)=>(b.likes_count-(b.dislikes_count||0))-(a.likes_count-(a.dislikes_count||0)))
     return p.sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
   }
 
@@ -515,6 +524,9 @@ export default function App() {
     return ()=>{ document.body.classList.remove('modal-open'); document.body.style.top = '' }
   },[showPost,showRepost])
 
+  // Clear unread badge when user navigates to messages page
+  useEffect(()=>{ if(page==='messages'&&profile) loadUnread() },[page])
+
   useEffect(()=>{
     if (!searchQ.trim()) { setSearchRes([]); return }
     const t = setTimeout(async()=>{ const { data }=await sb.from('posts').select('*,profiles(*)').ilike('text',`%${searchQ}%`).limit(30); setSearchRes(data||[]) },300)
@@ -579,7 +591,7 @@ export default function App() {
     }, 350)
   }
 
-    const FEED_TABS = ['Top',"Fizzin'",'New'] as const
+    const FEED_TABS = ['Top','Heha!','New'] as const
   const POST_TAGS = [
     {tag:'LOST & FOUND',emoji:'❓',bg:'#fde8d0',color:'#d97706'},
     {tag:'SHOUT OUT',emoji:'👏',bg:'#fde8d0',color:'#ea580c'},
@@ -623,6 +635,7 @@ export default function App() {
   msgPullYRef.current = msgPullY
   mktMyViewOpenRef.current = mktMyView
   profPullYRef.current = profPullY
+  srchPullYRef.current = srchPullY
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -702,16 +715,17 @@ export default function App() {
         }
         return
       }
-      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile') return
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile' && pageRef.current !== 'search') return
       // Vertical pull-to-refresh — runs for all content pages
       if (swipeLocked.current === 'v' && window.scrollY < 5 && dy > 0) {
         if (e.cancelable) e.preventDefault()
         if (pageRef.current === 'market') setMktPullY(Math.min(dy * 0.45, 72))
         else if (pageRef.current === 'messages') setMsgPullY(Math.min(dy * 0.45, 72))
         else if (pageRef.current === 'profile') setProfPullY(Math.min(dy * 0.45, 72))
+        else if (pageRef.current === 'search') setSrchPullY(Math.min(dy * 0.45, 72))
         else setPullY(Math.min(dy * 0.45, 72))
       }
-      if (pageRef.current === 'market' || pageRef.current === 'messages' || pageRef.current === 'profile') return
+      if (pageRef.current === 'market' || pageRef.current === 'messages' || pageRef.current === 'profile' || pageRef.current === 'search') return
       // Feed horizontal tab swipe
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
@@ -719,7 +733,7 @@ export default function App() {
         feedSwipeDir.current = dx > 0 ? 1 : -1
         // Move indicator
         if (indicatorRef.current) {
-          const tabIdx = ['Top',"Fizzin'",'New'].indexOf(feedTabRef.current)
+          const tabIdx = ['Top','Heha!','New'].indexOf(feedTabRef.current)
           const pct = Math.max(0, Math.min(66.666, tabIdx * 33.333 + (-dx / window.innerWidth * 100)))
           indicatorRef.current.style.left = pct + '%'
           indicatorRef.current.style.transition = 'none'
@@ -817,13 +831,21 @@ export default function App() {
         }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
-      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile') return
+      if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile' && pageRef.current !== 'search') return
       if (pageRef.current === 'profile') {
         if (profPullYRef.current > 52) {
           setProfRefreshing(true); setProfPullY(0)
           await loadPosts()
           setProfRefreshing(false)
         } else { setProfPullY(0) }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
+      if (pageRef.current === 'search') {
+        if (srchPullYRef.current > 52) {
+          setSrchRefreshing(true); setSrchPullY(0)
+          await loadPosts()
+          setSrchRefreshing(false)
+        } else { setSrchPullY(0) }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
       if (pageRef.current === 'market') {
@@ -849,7 +871,7 @@ export default function App() {
         await loadPosts()
         setRefreshing(false)
       } else { setPullY(0) }
-      const tabs = ['Top',"Fizzin'",'New'] as const
+      const tabs = ['Top','Heha!','New'] as const
       const idx = tabs.indexOf(feedTabRef.current as any)
       let newTab: typeof tabs[number] | null = null
       if (swipeLocked.current === 'h' && Math.abs(swipeXRef.current) > 40) {
@@ -923,7 +945,7 @@ export default function App() {
     return (
       <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
         {/* avatar — wrapper div shows bg color while img loads, preventing flash */}
-        <div style={{width:'44px',height:'44px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
+        <div style={{width:'36px',height:'36px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
           <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
         </div>
         {/* main */}
@@ -1032,7 +1054,7 @@ export default function App() {
 
   // ── AUTH ──
   if (!session||!profile) return (
-    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'Varela Round','Nunito',-apple-system,sans-serif"}}>
+    <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif"}}>
       <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright,letterSpacing:'-1px'}}>heha</div>
       <div style={{width:'100%',maxWidth:'360px'}}>
         <div style={{display:'flex',background:C.surface,borderRadius:'14px',padding:'4px',marginBottom:'20px'}}>
@@ -1088,8 +1110,8 @@ export default function App() {
     if (mktSort==='highest') return b.price-a.price
     return new Date(b.created_at).getTime()-new Date(a.created_at).getTime() // newest
   })
-  const topBar = (title: React.ReactNode, right?: React.ReactNode) => (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,borderBottom:`1px solid ${C.border}`}}>
+  const topBar = (title: React.ReactNode, right?: React.ReactNode, noBorder?: boolean) => (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,...(noBorder?{}:{borderBottom:`1px solid ${C.border}`})}}>
       <div style={{fontWeight:700,fontSize:'1.05rem',display:'flex',alignItems:'center',gap:'8px'}}>{title}</div>
       {right}
     </div>
@@ -1097,7 +1119,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
     >
 
       {/* ─── FEED ─── */}
@@ -1110,17 +1132,18 @@ export default function App() {
               {online} online
             </span>
             <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',padding:0}}>⚙️</button>
-          </div>
+          </div>,
+          true
         )}
         <div style={{background:C.bg,position:'sticky',top:'53px',zIndex:99,borderBottom:`1px solid ${C.border}`}}>
           <div style={{display:'flex',position:'relative'}}>
-            {(['Top',"Fizzin'",'New'] as const).map(t=>(
+            {(['Top','Heha!','New'] as const).map(t=>(
               <div key={t} onClick={()=>setFeedTab(t)} style={{flex:1,padding:'10px',textAlign:'center',fontSize:'0.95rem',fontWeight:feedTab===t?900:700,color:feedTab===t?C.text:C.muted,cursor:'pointer',transition:'color .2s'}}>
                 {t}
               </div>
             ))}
             {/* sliding indicator — follows finger via ref, no re-render */}
-            <div ref={indicatorRef} style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${(['Top',"Fizzin'",'New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
+            <div ref={indicatorRef} style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${(['Top','Heha!','New'].indexOf(feedTab))*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
           </div>
         </div>
         {/* pull-to-refresh indicator */}
@@ -1139,7 +1162,7 @@ export default function App() {
 
       {/* ─── MESSAGES ─── */}
       {page==='messages' && <>
-        {topBar('Messages')}
+        {topBar('Messages', undefined, true)}
         {/* Messages pull-to-refresh indicator */}
         <div style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:msgRefreshing?'52px':`${msgPullY}px`,transition:msgPullY===0?'height 0.25s ease':'none'}}>
           <div className={msgRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:msgRefreshing?undefined:`rotate(${msgPullY*4}deg)`,transition:msgRefreshing?'none':'transform 0.1s'}}/>
@@ -1209,36 +1232,77 @@ export default function App() {
         )}
       </>}
 
-      {/* ─── SEARCH ─── */}
-      {page==='search' && <>
-        {topBar('Search')}
-        <div style={{display:'flex',alignItems:'center',gap:'10px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'24px',padding:'10px 16px',margin:'12px 16px'}}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:'0.95rem',outline:'none',fontFamily:'inherit'}} placeholder="Search heha" value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+      {/* ─── SEARCH / DISCOVER ─── */}
+      {page==='search' && <div className="feed-swipe">
+        {/* Sticky search bar */}
+        <div style={{position:'sticky',top:0,zIndex:100,background:C.bg,padding:'12px 16px',borderBottom:searchQ?`1px solid ${C.border}`:'none'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'10px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'24px',padding:'10px 16px'}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:'0.95rem',outline:'none',fontFamily:'inherit'}} placeholder="Search heha" value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
+            {searchQ&&<button onClick={()=>setSearchQ('')} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:0,fontSize:'1.1rem'}}>✕</button>}
+          </div>
         </div>
-        {searchRes.map(p=><PostCard key={p.id} p={p}/>)}
-        {searchQ&&searchRes.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>没有找到结果</div>}
-        {!searchQ && <div style={{padding:'0 16px'}}>
-          <div style={{fontSize:'0.78rem',fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:'.5px',padding:'12px 0 6px'}}>Trending in your school</div>
-          {(() => {
-            // Extract hashtags from recent posts, fall back to post snippets
-            const tagCount: Record<string,number> = {}
-            posts.slice(0,80).forEach(p => {
-              const matches = p.text.match(/#[\w\u4e00-\u9fa5]+/g)||[]
-              matches.forEach(t => { tagCount[t] = (tagCount[t]||0) + 1 })
-            })
-            const tags = Object.entries(tagCount).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t)
-            const fallback = posts.slice(0,6).map(p=>p.text.replace(/\n/g,' ').slice(0,20).trim()).filter(Boolean)
-            const items = tags.length >= 3 ? tags : fallback.slice(0,6)
-            return items.map((t,i)=>(
-              <div key={t+i} onClick={()=>setSearchQ(t)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'14px 0',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
-                <span style={{color:C.muted,fontWeight:700,width:'22px',fontSize:'0.88rem'}}>{i+1}</span>
-                <span style={{fontWeight:600,fontSize:'0.95rem'}}>{t}</span>
-              </div>
-            ))
-          })()}
-        </div>}
-      </>}
+        {/* Search results */}
+        {searchQ && <>
+          {searchRes.map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
+          {searchRes.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>没有找到结果</div>}
+        </>}
+        {/* Discover sections */}
+        {!searchQ && (()=>{
+          const pullEl = (
+            <div key="pull" style={{display:'flex',justifyContent:'center',alignItems:'center',overflow:'hidden',height:srchRefreshing?'52px':`${srchPullY}px`,transition:srchPullY===0?'height 0.25s ease':'none'}}>
+              <div className={srchRefreshing?'spin':''} style={{width:'22px',height:'22px',borderRadius:'50%',border:`2px solid ${C.border}`,borderTop:`2px solid ${C.accentBright}`,transform:srchRefreshing?undefined:`rotate(${srchPullY*4}deg)`,transition:srchRefreshing?'none':'transform 0.1s'}}/>
+            </div>
+          )
+          const taggedSections = POST_TAGS.map(tagDef=>{
+            const tagPosts = posts.filter(p=>p.text.startsWith(tagDef.tag+'\n')||p.text===tagDef.tag)
+            return {tagDef,tagPosts}
+          }).filter(s=>s.tagPosts.length>0)
+          const taggedIds = new Set(taggedSections.flatMap(s=>s.tagPosts.map(p=>p.id)))
+          const recentPosts = posts.filter(p=>!taggedIds.has(p.id)).slice(0,10)
+          const sections = [...taggedSections,...(recentPosts.length>0?[{tagDef:{tag:'RECENT',emoji:'🆕',bg:resolved==='light'?'#f0f4ff':'rgba(99,102,241,0.15)',color:'#6366f1'},tagPosts:recentPosts}]:[])]
+          return <>
+            {pullEl}
+            <div style={{paddingBottom:'20px'}}>
+              {sections.map(({tagDef,tagPosts})=>(
+                <div key={tagDef.tag}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px'}}>
+                    <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'5px 14px',borderRadius:'20px',background:tagDef.bg,color:tagDef.color,fontWeight:800,fontSize:'0.82rem',letterSpacing:'0.5px'}}>
+                      <span>{tagDef.emoji}</span><span>{tagDef.tag}</span>
+                    </div>
+                    <button onClick={()=>setSearchQ(tagDef.tag)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.82rem',fontWeight:700,display:'flex',alignItems:'center',gap:'3px',fontFamily:'inherit'}}>
+                      VIEW MORE <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                  <div style={{display:'flex',gap:'10px',overflowX:'auto',paddingLeft:'16px',paddingRight:'16px',paddingBottom:'12px',scrollbarWidth:'none'} as React.CSSProperties}>
+                    {tagPosts.slice(0,8).map(p=>{
+                      const displayText=p.text.startsWith(tagDef.tag+'\n')?p.text.slice(tagDef.tag.length+1).trim():p.text
+                      const hasImg=p.images&&p.images.length>0
+                      return (
+                        <div key={p.id} onClick={()=>openPost(p)} style={{flexShrink:0,width:'210px',borderRadius:'16px',border:`1px solid ${C.border}`,background:C.bg,cursor:'pointer',overflow:'hidden',boxShadow:resolved==='light'?'0 2px 10px rgba(0,0,0,0.07)':'none'}}>
+                          <div style={{padding:'12px 12px 8px'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'7px',marginBottom:'7px'}}>
+                              <div style={{width:'28px',height:'28px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
+                                <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                              </div>
+                              <span style={{fontWeight:700,fontSize:'0.8rem',color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.is_anon?'Anonymous':(p.profiles?.username||'User')}</span>
+                              <span style={{color:C.muted,fontSize:'0.72rem',flexShrink:0}}>{ago(p.created_at)}</span>
+                            </div>
+                            <div style={{fontSize:'0.87rem',color:C.text,lineHeight:'1.45',display:'-webkit-box',overflow:'hidden',WebkitBoxOrient:'vertical',WebkitLineClamp:hasImg?2:4} as React.CSSProperties}>{displayText}</div>
+                          </div>
+                          {hasImg&&<img src={(p.images as string[])[0]} alt="" style={{width:'100%',height:'120px',objectFit:'cover',display:'block'}}/>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{height:'1px',background:C.border}}/>
+                </div>
+              ))}
+              {sections.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'80px 20px',fontSize:'0.95rem'}}>暂无内容，快去发帖吧！</div>}
+            </div>
+          </>
+        })()}
+      </div>}
 
       {/* ─── MARKET ─── */}
       {page==='market' && <>
@@ -1302,98 +1366,6 @@ export default function App() {
           <span>List</span>
         </button>
 
-        {/* ─── LISTING DETAIL ─── */}
-        {selectedListing&&(
-          <div ref={listingDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
-            {/* top bar */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
-              <button onClick={()=>setSelectedListing(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
-              <button style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-              </button>
-            </div>
-            {/* image carousel */}
-            {selectedListing.images&&selectedListing.images.length>0 ? (
-              <div style={{position:'relative',width:'100%',aspectRatio:'1',overflow:'hidden'}}>
-                <div style={{display:'flex',height:'100%',transition:'transform 0.25s cubic-bezier(0.4,0,0.2,1)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
-                  {selectedListing.images.map((img,i)=>(
-                    <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover'}}/>
-                  ))}
-                </div>
-                {selectedListing.images.length>1&&(
-                  <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
-                    {selectedListing.images.map((_,i)=>(
-                      <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{width:'100%',aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
-            )}
-            {/* info */}
-            <div style={{padding:'16px 18px 32px'}}>
-              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'4px'}}>
-                <div style={{fontSize:'1.7rem',fontWeight:900,color:C.text}}>${selectedListing.price}</div>
-                <div style={{display:'flex',gap:'12px'}}>
-                  <button style={{background:'none',border:'none',cursor:'pointer',color:C.muted}}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-                  </button>
-                  <button style={{background:'none',border:'none',cursor:'pointer',color:C.muted}}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div style={{fontSize:'1.15rem',fontWeight:700,color:C.text,marginBottom:'16px'}}>{selectedListing.title}</div>
-              {/* action buttons */}
-              <div style={{display:'flex',gap:'10px',marginBottom:'22px'}}>
-                <button onClick={()=>setSavedListings(s=>s.includes(selectedListing.id)?s.filter(x=>x!==selectedListing.id):[...s,selectedListing.id])} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:resolved==='light'?'#f0f0f0':C.surface2,color:C.text,fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill={savedListings.includes(selectedListing.id)?C.text:'none'} stroke={C.text} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-                  {savedListings.includes(selectedListing.id)?'Saved':'Save for later'}
-                </button>
-                <button onClick={()=>{ if(selectedListing.profiles){ const pid=(selectedListing.profiles as any).id||selectedListing.user_id; setMktConvoPartners(p=>{const n=p.includes(pid)?p:[...p,pid];localStorage.setItem('heha_mkt_convos',JSON.stringify(n));return n}); setSelectedListing(null); setPage('messages'); setMsgTab('market'); setTimeout(()=>openChat(selectedListing.profiles as Profile),60)} }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:'#6C2BD9',color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  Message Seller
-                </button>
-              </div>
-              {/* description */}
-              {selectedListing.description&&<>
-                <div style={{fontWeight:800,fontSize:'1rem',color:C.text,marginBottom:'6px'}}>Description</div>
-                <div style={{fontSize:'0.95rem',color:resolved==='light'?'#333':C.text,lineHeight:'1.6',marginBottom:'20px'}}>{selectedListing.description}</div>
-              </>}
-              {/* details */}
-              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'20px'}}>
-                {(selectedListing as any).condition&&<div style={{display:'flex',gap:'16px'}}><span style={{fontWeight:800,color:C.text,minWidth:'90px'}}>Condition</span><span style={{color:resolved==='light'?'#555':C.muted}}>{(selectedListing as any).condition}</span></div>}
-                {selectedListing.category&&<div style={{display:'flex',gap:'16px'}}><span style={{fontWeight:800,color:C.text,minWidth:'90px'}}>Category</span><span style={{color:resolved==='light'?'#555':C.muted,textTransform:'capitalize'}}>{selectedListing.category}</span></div>}
-              </div>
-              <div style={{fontSize:'0.85rem',color:C.muted,marginBottom:'28px'}}>Posted {ago(selectedListing.created_at)}</div>
-              {/* similar items */}
-              {listings.filter(l=>l.id!==selectedListing.id&&l.category===selectedListing.category&&!l.is_sold).length>0&&<>
-                <div style={{fontWeight:800,fontSize:'1.05rem',color:C.text,marginBottom:'14px'}}>Similar Items</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-                  {listings.filter(l=>l.id!==selectedListing.id&&l.category===selectedListing.category&&!l.is_sold).slice(0,4).map(l=>(
-                    <div key={l.id} onClick={()=>setSelectedListing(l)} style={{borderRadius:'12px',overflow:'hidden',border:`1px solid ${C.border}`,cursor:'pointer'}}>
-                      {l.images&&l.images.length>0
-                        ? <img src={l.images[0]} alt={l.title} style={{width:'100%',aspectRatio:'1',objectFit:'cover',display:'block'}}/>
-                        : <div style={{aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2rem'}}>{l.emoji||'📦'}</div>
-                      }
-                      <div style={{padding:'8px'}}>
-                        <div style={{fontWeight:700,fontSize:'0.82rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.title}</div>
-                        <div style={{fontWeight:800,fontSize:'0.88rem'}}>${l.price}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>}
-              {/* own listing actions */}
-              {selectedListing.user_id===profile.id&&(
-                <button onClick={()=>sb.from('listings').update({is_sold:true}).eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})} style={{marginTop:'20px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:'14px',color:C.muted,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-                  Mark as Sold
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ─── MY SAVED / MY LISTINGS OVERLAY ─── */}
         {mktMyView&&(
@@ -1581,7 +1553,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'12px 0 4px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0 6px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
@@ -1673,7 +1645,7 @@ export default function App() {
                 <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickImgs} />
               </label>
               <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',fontWeight:800,fontSize:'0.78rem',color:C.muted,fontFamily:'inherit'}}>MEME</button>
-              <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',fontWeight:800,fontSize:'0.78rem',color:C.muted,fontFamily:'inherit',border:`1px solid ${C.border}`,borderRadius:'5px'}}>GIF</button>
+              <button style={{background:'none',border:`1px solid ${C.border}`,cursor:'pointer',padding:'5px',fontWeight:800,fontSize:'0.78rem',color:C.muted,fontFamily:'inherit',borderRadius:'5px'}}>GIF</button>
               <button style={{background:'none',border:'none',cursor:'pointer',padding:'5px',color:C.muted}}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
               </button>
@@ -1790,7 +1762,7 @@ export default function App() {
             {/* DETAILS */}
             <div style={{paddingTop:'20px',marginBottom:'0'}}>
               <div style={{fontWeight:800,fontSize:'0.82rem',letterSpacing:'.5px',color:C.text,marginBottom:'12px'}}>DETAILS</div>
-              <button onClick={()=>setListingView('cat')} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0',borderBottom:`1px solid ${C.border}`,background:'none',border:'none',borderBottom:`1px solid ${C.border}`,cursor:'pointer',fontFamily:'inherit'}}>
+              <button onClick={()=>setListingView('cat')} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 0',borderBottom:`1px solid ${C.border}`,background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>
                 <span style={{color:lf.cat?C.text:C.muted,fontSize:'0.97rem',fontWeight:lf.cat?700:400}}>{lf.cat||'Select Category'}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
@@ -1804,6 +1776,99 @@ export default function App() {
             <button onClick={submitListing} disabled={!lf.title||lUploading} style={{marginTop:'32px',width:'100%',padding:'16px',borderRadius:'14px',background:lf.title&&!lUploading?C.accentBright:'#888',color:'white',border:'none',fontWeight:800,fontSize:'1rem',cursor:lf.title&&!lUploading?'pointer':'not-allowed',fontFamily:'inherit'}}>
               {lUploading?'Listing…':'List item'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── LISTING DETAIL ─── */}
+      {selectedListing&&(
+        <div ref={listingDetailRef} className="slide-in-right" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+          {/* top bar */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
+            <button onClick={()=>setSelectedListing(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+            <button style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            </button>
+          </div>
+          {/* image carousel */}
+          {selectedListing.images&&selectedListing.images.length>0 ? (
+            <div style={{position:'relative',width:'100%',aspectRatio:'1',overflow:'hidden'}}>
+              <div style={{display:'flex',height:'100%',transition:'transform 0.25s cubic-bezier(0.4,0,0.2,1)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
+                {selectedListing.images.map((img,i)=>(
+                  <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover'}}/>
+                ))}
+              </div>
+              {selectedListing.images.length>1&&(
+                <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
+                  {selectedListing.images.map((_,i)=>(
+                    <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{width:'100%',aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
+          )}
+          {/* info */}
+          <div style={{padding:'16px 18px 32px'}}>
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'4px'}}>
+              <div style={{fontSize:'1.7rem',fontWeight:900,color:C.text}}>${selectedListing.price}</div>
+              <div style={{display:'flex',gap:'12px'}}>
+                <button style={{background:'none',border:'none',cursor:'pointer',color:C.muted}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+                </button>
+                <button style={{background:'none',border:'none',cursor:'pointer',color:C.muted}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                </button>
+              </div>
+            </div>
+            <div style={{fontSize:'1.15rem',fontWeight:700,color:C.text,marginBottom:'16px'}}>{selectedListing.title}</div>
+            {/* action buttons */}
+            <div style={{display:'flex',gap:'10px',marginBottom:'22px'}}>
+              <button onClick={()=>setSavedListings(s=>s.includes(selectedListing.id)?s.filter(x=>x!==selectedListing.id):[...s,selectedListing.id])} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:resolved==='light'?'#f0f0f0':C.surface2,color:C.text,fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={savedListings.includes(selectedListing.id)?C.text:'none'} stroke={C.text} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                {savedListings.includes(selectedListing.id)?'Saved':'Save for later'}
+              </button>
+              <button onClick={()=>{ if(selectedListing.profiles){ const pid=(selectedListing.profiles as any).id||selectedListing.user_id; setMktConvoPartners(p=>{const n=p.includes(pid)?p:[...p,pid];localStorage.setItem('heha_mkt_convos',JSON.stringify(n));return n}); setSelectedListing(null); setPage('messages'); setMsgTab('market'); setTimeout(()=>openChat(selectedListing.profiles as Profile),60)} }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:'#6C2BD9',color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Message Seller
+              </button>
+            </div>
+            {/* description */}
+            {selectedListing.description&&<>
+              <div style={{fontWeight:800,fontSize:'1rem',color:C.text,marginBottom:'6px'}}>Description</div>
+              <div style={{fontSize:'0.95rem',color:resolved==='light'?'#333':C.text,lineHeight:'1.6',marginBottom:'20px'}}>{selectedListing.description}</div>
+            </>}
+            {/* details */}
+            <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'20px'}}>
+              {(selectedListing as any).condition&&<div style={{display:'flex',gap:'16px'}}><span style={{fontWeight:800,color:C.text,minWidth:'90px'}}>Condition</span><span style={{color:resolved==='light'?'#555':C.muted}}>{(selectedListing as any).condition}</span></div>}
+              {selectedListing.category&&<div style={{display:'flex',gap:'16px'}}><span style={{fontWeight:800,color:C.text,minWidth:'90px'}}>Category</span><span style={{color:resolved==='light'?'#555':C.muted,textTransform:'capitalize'}}>{selectedListing.category}</span></div>}
+            </div>
+            <div style={{fontSize:'0.85rem',color:C.muted,marginBottom:'28px'}}>Posted {ago(selectedListing.created_at)}</div>
+            {/* similar items */}
+            {listings.filter(l=>l.id!==selectedListing.id&&l.category===selectedListing.category&&!l.is_sold).length>0&&<>
+              <div style={{fontWeight:800,fontSize:'1.05rem',color:C.text,marginBottom:'14px'}}>Similar Items</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+                {listings.filter(l=>l.id!==selectedListing.id&&l.category===selectedListing.category&&!l.is_sold).slice(0,4).map(l=>(
+                  <div key={l.id} onClick={()=>setSelectedListing(l)} style={{borderRadius:'12px',overflow:'hidden',border:`1px solid ${C.border}`,cursor:'pointer'}}>
+                    {l.images&&l.images.length>0
+                      ? <img src={l.images[0]} alt={l.title} style={{width:'100%',aspectRatio:'1',objectFit:'cover',display:'block'}}/>
+                      : <div style={{aspectRatio:'1',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2rem'}}>{l.emoji||'📦'}</div>
+                    }
+                    <div style={{padding:'8px'}}>
+                      <div style={{fontWeight:700,fontSize:'0.82rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.title}</div>
+                      <div style={{fontWeight:800,fontSize:'0.88rem'}}>${l.price}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>}
+            {/* own listing actions */}
+            {selectedListing.user_id===profile.id&&(
+              <button onClick={()=>sb.from('listings').update({is_sold:true}).eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})} style={{marginTop:'20px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:'14px',color:C.muted,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                Mark as Sold
+              </button>
+            )}
           </div>
         </div>
       )}
