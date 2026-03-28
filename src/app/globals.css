@@ -76,6 +76,11 @@ body.modal-open {
 }
 .fade-out { animation: fadeOut 0.22s ease forwards; }
 
+@keyframes lightboxZoom {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
 @keyframes slideInRight {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }

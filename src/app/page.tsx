@@ -133,9 +133,12 @@ export default function App() {
   const repostDragTrack = useRef(0)
   const chatDetailRef = useRef<HTMLDivElement>(null)
   const chatTargetRef = useRef<Profile|null>(null)
+  const chatBackdropRef = useRef<HTMLDivElement>(null)
   const detailBackdropRef = useRef<HTMLDivElement>(null)
   const listingDetailRef = useRef<HTMLDivElement>(null)
+  const listingBackdropRef = useRef<HTMLDivElement>(null)
   const selectedListingRef = useRef<Listing|null>(null)
+  const mktMyViewBackdropRef = useRef<HTMLDivElement>(null)
   const postDragStart = useRef(0)
   const [postImgs, setPostImgs] = useState([])
   const [postPrevs, setPostPrevs] = useState([])
@@ -178,6 +181,16 @@ export default function App() {
   const mktMyViewRef = useRef<HTMLDivElement>(null)
   const mktMyViewOpenRef = useRef<null|'saved'|'mine'>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [searchOverlay, setSearchOverlay] = useState(false)
+  const searchOverlayRef = useRef<HTMLDivElement>(null)
+  const searchBackdropRef = useRef<HTMLDivElement>(null)
+  const searchOverlayOpenRef = useRef(false)
+  const [lightboxImg, setLightboxImg] = useState<string|null>(null)
+  const [lightboxScale, setLightboxScale] = useState(1)
+  const listingCarouselRef = useRef<HTMLDivElement>(null)
+  const carouselTouchStart = useRef({x:0,idx:0})
+  const [carouselDragX, setCarouselDragX] = useState(0)
+  const [carouselDragging, setCarouselDragging] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -583,7 +596,33 @@ export default function App() {
       chatDetailRef.current.style.transition = 'transform 0.28s ease'
       chatDetailRef.current.style.transform = 'translateX(100%)'
     }
+    if (chatBackdropRef.current) {
+      chatBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      chatBackdropRef.current.style.opacity = '0'
+    }
     setTimeout(() => setChatTarget(null), 290)
+  }
+  function closeListingDetail() {
+    if (listingDetailRef.current) {
+      listingDetailRef.current.style.transition = 'transform 0.28s ease'
+      listingDetailRef.current.style.transform = 'translateX(100%)'
+    }
+    if (listingBackdropRef.current) {
+      listingBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      listingBackdropRef.current.style.opacity = '0'
+    }
+    setTimeout(() => setSelectedListing(null), 290)
+  }
+  function closeSearchOverlay() {
+    if (searchOverlayRef.current) {
+      searchOverlayRef.current.style.transition = 'transform 0.28s ease'
+      searchOverlayRef.current.style.transform = 'translateX(100%)'
+    }
+    if (searchBackdropRef.current) {
+      searchBackdropRef.current.style.transition = 'opacity 0.28s ease'
+      searchBackdropRef.current.style.opacity = '0'
+    }
+    setTimeout(() => setSearchOverlay(false), 290)
   }
   function closeRepost() {
     setRepostClosing(true)
@@ -639,6 +678,7 @@ export default function App() {
   mktMyViewOpenRef.current = mktMyView
   profPullYRef.current = profPullY
   srchPullYRef.current = srchPullY
+  searchOverlayOpenRef.current = searchOverlay
 
   useEffect(() => {
     let sx = 0, sy = 0
@@ -683,6 +723,11 @@ export default function App() {
           chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'none'
           chatDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          if (chatBackdropRef.current) {
+            chatBackdropRef.current.style.animation = 'none'
+            chatBackdropRef.current.style.transition = 'none'
+            chatBackdropRef.current.style.opacity = String(Math.max(0, 1 - dx / window.innerWidth))
+          }
         }
         return
       }
@@ -695,17 +740,18 @@ export default function App() {
           mktMyViewRef.current.style.animation = 'none'
           mktMyViewRef.current.style.transition = 'none'
           mktMyViewRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          if (mktMyViewBackdropRef.current) {
+            mktMyViewBackdropRef.current.style.animation = 'none'
+            mktMyViewBackdropRef.current.style.transition = 'none'
+            mktMyViewBackdropRef.current.style.opacity = String(Math.max(0, 1 - dx / window.innerWidth))
+          }
         }
         return
       }
-      // Listing detail open: swipe-back (right) or photo swipe (left)
+      // Listing detail open: swipe-back (right)
       if (selectedListingRef.current) {
-        const imgs = (selectedListingRef.current as any).images || []
-        const onFirstPhoto = listingPhotoIdxRef.current === 0
-        const onLastPhoto = listingPhotoIdxRef.current >= imgs.length - 1
-        if (dx > 8 && onFirstPhoto) swipeLocked.current = 'h'
-        if (dx < -8 && !onLastPhoto) swipeLocked.current = 'h'
-        if (swipeLocked.current === 'h' && dx > 0 && onFirstPhoto) {
+        if (dx > 8) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0) {
           if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
           if (listingDetailRef.current) {
@@ -713,8 +759,28 @@ export default function App() {
             listingDetailRef.current.style.transition = 'none'
             listingDetailRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
           }
-        } else if (swipeLocked.current === 'h' && dx < 0) {
+          if (listingBackdropRef.current) {
+            listingBackdropRef.current.style.animation = 'none'
+            listingBackdropRef.current.style.transition = 'none'
+            listingBackdropRef.current.style.opacity = String(Math.max(0, 1 - dx / window.innerWidth))
+          }
+        }
+        return
+      }
+      // Search results overlay: swipe-back
+      if (searchOverlayOpenRef.current && searchOverlayRef.current) {
+        if (dx > 8) swipeLocked.current = 'h'
+        if (swipeLocked.current === 'h' && dx > 0) {
+          if (e.cancelable) e.preventDefault()
           swipeXRef.current = dx
+          searchOverlayRef.current.style.animation = 'none'
+          searchOverlayRef.current.style.transition = 'none'
+          searchOverlayRef.current.style.transform = `translateX(${Math.max(0, dx)}px)`
+          if (searchBackdropRef.current) {
+            searchBackdropRef.current.style.animation = 'none'
+            searchBackdropRef.current.style.transition = 'none'
+            searchBackdropRef.current.style.opacity = String(Math.max(0, 1 - dx / window.innerWidth))
+          }
         }
         return
       }
@@ -756,12 +822,14 @@ export default function App() {
           chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'transform 0.28s ease'
           chatDetailRef.current.style.transform = 'translateX(100%)'
+          if (chatBackdropRef.current) { chatBackdropRef.current.style.transition = 'opacity 0.28s ease'; chatBackdropRef.current.style.opacity = '0' }
           setTimeout(() => setChatTarget(null), 290)
         } else {
           chatDetailRef.current.style.animation = 'none'
           chatDetailRef.current.style.transition = 'transform 0.25s ease'
           chatDetailRef.current.style.transform = 'translateX(0)'
-          setTimeout(() => { if (chatDetailRef.current) chatDetailRef.current.style.transition = '' }, 260)
+          if (chatBackdropRef.current) { chatBackdropRef.current.style.transition = 'opacity 0.25s ease'; chatBackdropRef.current.style.opacity = '1' }
+          setTimeout(() => { if (chatDetailRef.current) chatDetailRef.current.style.transition = ''; if (chatBackdropRef.current) chatBackdropRef.current.style.transition = '' }, 260)
         }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
@@ -799,38 +867,52 @@ export default function App() {
           mktMyViewRef.current.style.animation = 'none'
           mktMyViewRef.current.style.transition = 'transform 0.28s ease'
           mktMyViewRef.current.style.transform = 'translateX(100%)'
+          if (mktMyViewBackdropRef.current) { mktMyViewBackdropRef.current.style.transition = 'opacity 0.28s ease'; mktMyViewBackdropRef.current.style.opacity = '0' }
           setTimeout(() => setMktMyView(null), 290)
         } else {
           mktMyViewRef.current.style.animation = 'none'
           mktMyViewRef.current.style.transition = 'transform 0.25s ease'
           mktMyViewRef.current.style.transform = 'translateX(0)'
-          setTimeout(() => { if (mktMyViewRef.current) mktMyViewRef.current.style.transition = '' }, 260)
+          if (mktMyViewBackdropRef.current) { mktMyViewBackdropRef.current.style.transition = 'opacity 0.25s ease'; mktMyViewBackdropRef.current.style.opacity = '1' }
+          setTimeout(() => { if (mktMyViewRef.current) mktMyViewRef.current.style.transition = ''; if (mktMyViewBackdropRef.current) mktMyViewBackdropRef.current.style.transition = '' }, 260)
         }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
-      // Listing detail: swipe-back, photo navigation, or snap back
+      // Search overlay: swipe-back or snap back
+      if (searchOverlayOpenRef.current && searchOverlayRef.current) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
+          searchOverlayRef.current.style.animation = 'none'
+          searchOverlayRef.current.style.transition = 'transform 0.28s ease'
+          searchOverlayRef.current.style.transform = 'translateX(100%)'
+          if (searchBackdropRef.current) { searchBackdropRef.current.style.transition = 'opacity 0.28s ease'; searchBackdropRef.current.style.opacity = '0' }
+          setTimeout(() => setSearchOverlay(false), 290)
+        } else {
+          searchOverlayRef.current.style.animation = 'none'
+          searchOverlayRef.current.style.transition = 'transform 0.25s ease'
+          searchOverlayRef.current.style.transform = 'translateX(0)'
+          if (searchBackdropRef.current) { searchBackdropRef.current.style.transition = 'opacity 0.25s ease'; searchBackdropRef.current.style.opacity = '1' }
+          setTimeout(() => { if (searchOverlayRef.current) searchOverlayRef.current.style.transition = ''; if (searchBackdropRef.current) searchBackdropRef.current.style.transition = '' }, 260)
+        }
+        swipeLocked.current = null; swipeXRef.current = 0; return
+      }
+      // Listing detail: swipe-back or snap back
       if (selectedListingRef.current) {
-        const imgs = (selectedListingRef.current as any).images || []
-        const onFirstPhoto = listingPhotoIdxRef.current === 0
-        if (swipeLocked.current === 'h' && swipeXRef.current > 80 && onFirstPhoto) {
+        if (swipeLocked.current === 'h' && swipeXRef.current > 80) {
           if (listingDetailRef.current) {
             listingDetailRef.current.style.animation = 'none'
             listingDetailRef.current.style.transition = 'transform 0.28s ease'
             listingDetailRef.current.style.transform = 'translateX(100%)'
           }
+          if (listingBackdropRef.current) { listingBackdropRef.current.style.transition = 'opacity 0.28s ease'; listingBackdropRef.current.style.opacity = '0' }
           setTimeout(() => setSelectedListing(null), 290)
         } else {
-          if (swipeLocked.current === 'h' && swipeXRef.current < -40 && listingPhotoIdxRef.current < imgs.length - 1) {
-            setListingPhotoIdx(i => i + 1)
-          } else if (swipeLocked.current === 'h' && swipeXRef.current > 40 && listingPhotoIdxRef.current > 0) {
-            setListingPhotoIdx(i => i - 1)
-          }
           if (listingDetailRef.current) {
             listingDetailRef.current.style.animation = 'none'
             listingDetailRef.current.style.transition = 'transform 0.25s ease'
             listingDetailRef.current.style.transform = 'translateX(0)'
             setTimeout(() => { if (listingDetailRef.current) listingDetailRef.current.style.transition = '' }, 260)
           }
+          if (listingBackdropRef.current) { listingBackdropRef.current.style.transition = 'opacity 0.25s ease'; listingBackdropRef.current.style.opacity = '1'; setTimeout(() => { if (listingBackdropRef.current) listingBackdropRef.current.style.transition = '' }, 260) }
         }
         swipeLocked.current = null; swipeXRef.current = 0; return
       }
@@ -1195,7 +1277,7 @@ export default function App() {
         })()}
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
         {chatTarget&&(<>
-          <div className="fade-in" style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
+          <div ref={chatBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
           <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
               <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
@@ -1242,14 +1324,22 @@ export default function App() {
         <div style={{position:'sticky',top:0,zIndex:100,background:C.bg,padding:'12px 16px',borderBottom:searchQ?`1px solid ${C.border}`:'none'}}>
           <div style={{display:'flex',alignItems:'center',gap:'10px',background:resolved==='light'?'#f0f0f0':C.surface2,borderRadius:'24px',padding:'10px 16px'}}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:'0.95rem',outline:'none',fontFamily:'inherit'}} placeholder="Search heha" value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
-            {searchQ&&<button onClick={()=>setSearchQ('')} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:0,fontSize:'1.1rem'}}>✕</button>}
+            <input style={{flex:1,background:'transparent',border:'none',color:C.text,fontSize:'0.95rem',outline:'none',fontFamily:'inherit'}} placeholder="Search heha" value={searchQ} onChange={e=>{setSearchQ(e.target.value);setSearchOverlay(false)}} onKeyDown={e=>{if(e.key==='Enter'&&searchQ.trim()) setSearchOverlay(true)}}/>
+            {searchQ&&<button onClick={()=>{setSearchQ('');setSearchOverlay(false)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:0,fontSize:'1.1rem'}}>✕</button>}
           </div>
         </div>
-        {/* Search results */}
-        {searchQ && <>
-          {searchRes.map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
-          {searchRes.length===0&&<div style={{color:C.muted,textAlign:'center',padding:'60px'}}>没有找到结果</div>}
+        {/* Search results — tapping a suggestion or pressing enter opens overlay */}
+        {searchQ && !searchOverlay && <>
+          <div style={{padding:'8px 16px'}}>
+            {searchRes.length>0 ? searchRes.slice(0,5).map(p=>(
+              <div key={p.id} onClick={()=>setSearchOverlay(true)} style={{display:'flex',alignItems:'center',gap:'10px',padding:'12px 0',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <div style={{flex:1,fontSize:'0.92rem',color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.text.slice(0,80)}</div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+            )) : <div style={{color:C.muted,textAlign:'center',padding:'60px'}}>没有找到结果</div>}
+            {searchRes.length>5&&<button onClick={()=>setSearchOverlay(true)} style={{width:'100%',padding:'14px',textAlign:'center',color:C.accentBright,fontWeight:700,fontSize:'0.92rem',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}>查看全部 {searchRes.length} 个结果 →</button>}
+          </div>
         </>}
         {/* Discover sections */}
         {!searchQ && (()=>{
@@ -1274,7 +1364,7 @@ export default function App() {
                     <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'5px 14px',borderRadius:'20px',background:tagDef.bg,color:tagDef.color,fontWeight:800,fontSize:'0.82rem',letterSpacing:'0.5px'}}>
                       <span>{tagDef.emoji}</span><span>{tagDef.tag}</span>
                     </div>
-                    <button onClick={()=>setSearchQ(tagDef.tag)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.82rem',fontWeight:700,display:'flex',alignItems:'center',gap:'3px',fontFamily:'inherit'}}>
+                    <button onClick={()=>{setSearchQ(tagDef.tag);setSearchOverlay(true)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.82rem',fontWeight:700,display:'flex',alignItems:'center',gap:'3px',fontFamily:'inherit'}}>
                       VIEW MORE <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
                     </button>
                   </div>
@@ -1307,6 +1397,25 @@ export default function App() {
           </>
         })()}
       </div>}
+
+      {/* ─── SEARCH RESULTS OVERLAY ─── */}
+      {searchOverlay&&searchQ&&(<>
+        <div ref={searchBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:249,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
+        <div ref={searchOverlayRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:250,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:10}}>
+            <button onClick={closeSearchOverlay} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+            <span style={{fontWeight:800,fontSize:'1.05rem',color:C.text,flex:1}}>「{searchQ}」的搜索结果</span>
+            <span style={{fontSize:'0.85rem',color:C.muted}}>{searchRes.length}条</span>
+          </div>
+          {searchRes.length>0
+            ? searchRes.map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)
+            : <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}>
+                <div style={{fontSize:'3rem',opacity:.4}}>🔍</div>
+                <div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>没有找到结果</div>
+              </div>
+          }
+        </div>
+      </>)}
 
       {/* ─── MARKET ─── */}
       {page==='market' && <>
@@ -1373,7 +1482,7 @@ export default function App() {
 
         {/* ─── MY SAVED / MY LISTINGS OVERLAY ─── */}
         {mktMyView&&(<>
-          <div className="fade-in" style={{position:'fixed',inset:0,zIndex:449,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
+          <div ref={mktMyViewBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:449,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
           <div ref={mktMyViewRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:450,background:C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:10}}>
               <button onClick={()=>setMktMyView(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
@@ -1787,31 +1896,61 @@ export default function App() {
 
       {/* ─── LISTING DETAIL ─── */}
       {selectedListing&&(<>
-        <div className="fade-in" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:399,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
+        <div ref={listingBackdropRef} className="fade-in" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:399,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
         <div ref={listingDetailRef} className="slide-in-right" style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
           {/* top bar */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
-            <button onClick={()=>setSelectedListing(null)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
+            <button onClick={closeListingDetail} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
             <button style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
           </div>
-          {/* image carousel — explicit height so it works inside scroll container */}
+          {/* image carousel — touch-swipeable with tap-to-enlarge */}
           <div style={{padding:'0 16px 12px'}}>
             {selectedListing.images&&selectedListing.images.length>0 ? (
-              <div style={{position:'relative',width:'100%',height:'300px',borderRadius:'18px',overflow:'hidden',background:C.surface}}>
-                <div style={{display:'flex',height:'100%',transition:'transform 0.25s cubic-bezier(0.4,0,0.2,1)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
+              <div style={{position:'relative',width:'100%',height:'300px',borderRadius:'18px',overflow:'hidden',background:C.surface,touchAction:'pan-y'}}
+                onTouchStart={e=>{
+                  const t=e.touches[0]
+                  carouselTouchStart.current={x:t.clientX,idx:listingPhotoIdx}
+                  setCarouselDragging(true)
+                  setCarouselDragX(0)
+                }}
+                onTouchMove={e=>{
+                  if(!carouselDragging) return
+                  const dx=e.touches[0].clientX-carouselTouchStart.current.x
+                  if(Math.abs(dx)>8 && e.cancelable) e.preventDefault()
+                  setCarouselDragX(dx)
+                }}
+                onTouchEnd={()=>{
+                  if(!carouselDragging){setCarouselDragging(false);return}
+                  const threshold=50
+                  const imgs=selectedListing.images!
+                  if(carouselDragX<-threshold && listingPhotoIdx<imgs.length-1){
+                    setListingPhotoIdx(i=>i+1)
+                  } else if(carouselDragX>threshold && listingPhotoIdx>0){
+                    setListingPhotoIdx(i=>i-1)
+                  }
+                  setCarouselDragX(0)
+                  setCarouselDragging(false)
+                }}
+              >
+                <div style={{display:'flex',height:'100%',transition:carouselDragging?'none':'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)',transform:`translateX(calc(${-listingPhotoIdx*100}% + ${carouselDragging?carouselDragX:0}px))`}}>
                   {selectedListing.images.map((img,i)=>(
-                    <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover'}}/>
+                    <img key={i} src={img} alt={selectedListing.title} onClick={()=>{if(Math.abs(carouselDragX)<5) setLightboxImg(img)}} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover',cursor:'pointer',userSelect:'none',WebkitUserDrag:'none'} as React.CSSProperties}/>
                   ))}
                 </div>
                 {selectedListing.images.length>1&&(
-                  <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
-                    {selectedListing.images.map((_,i)=>(
-                      <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
-                    ))}
-                  </div>
+                  <>
+                    {listingPhotoIdx>0&&<button onClick={()=>setListingPhotoIdx(i=>i-1)} style={{position:'absolute',left:'8px',top:'50%',transform:'translateY(-50%)',width:'32px',height:'32px',borderRadius:'50%',background:'rgba(0,0,0,0.4)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',zIndex:3,backdropFilter:'blur(4px)'}}>‹</button>}
+                    {listingPhotoIdx<selectedListing.images.length-1&&<button onClick={()=>setListingPhotoIdx(i=>i+1)} style={{position:'absolute',right:'8px',top:'50%',transform:'translateY(-50%)',width:'32px',height:'32px',borderRadius:'50%',background:'rgba(0,0,0,0.4)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',zIndex:3,backdropFilter:'blur(4px)'}}>›</button>}
+                    <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
+                      {selectedListing.images.map((_,i)=>(
+                        <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
+                      ))}
+                    </div>
+                  </>
                 )}
+                <div style={{position:'absolute',top:'12px',right:'12px',background:'rgba(0,0,0,0.5)',borderRadius:'12px',padding:'3px 10px',fontSize:'0.75rem',color:'white',fontWeight:700,zIndex:2}}>{listingPhotoIdx+1}/{selectedListing.images.length}</div>
               </div>
             ) : (
               <div style={{width:'100%',height:'300px',borderRadius:'18px',background:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'4rem'}}>{selectedListing.emoji||'📦'}</div>
@@ -1880,6 +2019,14 @@ export default function App() {
           </div>
         </div>
       </>)}
+
+      {/* ─── IMAGE LIGHTBOX ─── */}
+      {lightboxImg&&(
+        <div onClick={()=>setLightboxImg(null)} style={{position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,0.92)',display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn 0.2s ease',cursor:'zoom-out'}}>
+          <img src={lightboxImg} alt="" style={{maxWidth:'95vw',maxHeight:'90vh',objectFit:'contain',borderRadius:'8px',animation:'lightboxZoom 0.3s cubic-bezier(0.32,0.72,0,1) forwards'}}/>
+          <button onClick={e=>{e.stopPropagation();setLightboxImg(null)}} style={{position:'absolute',top:'calc(16px + env(safe-area-inset-top))',right:'16px',width:'36px',height:'36px',borderRadius:'50%',background:'rgba(255,255,255,0.15)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.2rem',backdropFilter:'blur(4px)'}}>✕</button>
+        </div>
+      )}
 
       {/* ─── SETTINGS MODAL ─── */}
       {showSettings && (
