@@ -369,11 +369,7 @@ export default function App() {
         const { error } = await sb.storage.from('listing-images').upload(path,file,{upsert:true})
         if (!error) { const { data: u } = sb.storage.from('listing-images').getPublicUrl(path); urls.push(u.publicUrl) }
       }
-      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',images:urls}
-      if (lf.cat) ins.category = lf.cat
-      if (lf.desc) ins.description = lf.desc
-      if (lf.condition) ins.condition = lf.condition
-      if (profile.school) ins.school = profile.school
+      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',images:urls,category:lf.cat||'Other',description:lf.desc||'',condition:lf.condition||'Good',school:profile.school||'Heha'}
       const { error: insertErr } = await sb.from('listings').insert(ins)
       if (insertErr) { console.error('Listing insert error:', insertErr); setLUploading(false); return }
       setLUploading(false)
@@ -1745,32 +1741,34 @@ export default function App() {
         <div
           ref={postSheetRef}
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:showTagPicker?'80vh':'58vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform'}}
-          onTouchStart={e=>{postDragStart.current=e.touches[0].clientY; postDragTrack.current=0}}
-          onTouchMove={e=>{
-            const dy=e.touches[0].clientY-postDragStart.current
-            if(dy>0 && postSheetRef.current){
-              postDragTrack.current=dy
-              postSheetRef.current.style.transition='none'
-              postSheetRef.current.style.transform=`translateY(${dy}px)`
-            }
-          }}
-          onTouchEnd={()=>{
-            if(postDragTrack.current>80){
-              if(postSheetRef.current){
-                postSheetRef.current.style.transition='transform 0.3s ease'
-                postSheetRef.current.style.transform='translateY(100%)'
-              }
-              setTimeout(()=>{setShowPost(false);setPostText('');setPostImgs([]);setPostPrevs([]);setPostTag('');setShowTagPicker(false)},300)
-            } else if(postSheetRef.current){
-              postSheetRef.current.style.transition='transform 0.3s cubic-bezier(0.32,0.72,0,1)'
-              postSheetRef.current.style.transform='translateY(0)'
-              setTimeout(()=>{if(postSheetRef.current)postSheetRef.current.style.transition=''},300)
-            }
-            postDragTrack.current=0
-          }}
+          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:showTagPicker?'85vh':'75vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform'}}
         >
-            <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}>
+            <div
+              style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}
+              onTouchStart={e=>{postDragStart.current=e.touches[0].clientY; postDragTrack.current=0}}
+              onTouchMove={e=>{
+                const dy=e.touches[0].clientY-postDragStart.current
+                if(dy>0 && postSheetRef.current){
+                  postDragTrack.current=dy
+                  postSheetRef.current.style.transition='none'
+                  postSheetRef.current.style.transform=`translateY(${dy}px)`
+                }
+              }}
+              onTouchEnd={()=>{
+                if(postDragTrack.current>80){
+                  if(postSheetRef.current){
+                    postSheetRef.current.style.transition='transform 0.3s ease'
+                    postSheetRef.current.style.transform='translateY(100%)'
+                  }
+                  setTimeout(()=>{setShowPost(false);setPostText('');setPostImgs([]);setPostPrevs([]);setPostTag('');setShowTagPicker(false)},300)
+                } else if(postSheetRef.current){
+                  postSheetRef.current.style.transition='transform 0.3s cubic-bezier(0.32,0.72,0,1)'
+                  postSheetRef.current.style.transform='translateY(0)'
+                  setTimeout(()=>{if(postSheetRef.current)postSheetRef.current.style.transition=''},300)
+                }
+                postDragTrack.current=0
+              }}
+            >
               <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px 8px',flexShrink:0}}>
@@ -1838,9 +1836,9 @@ export default function App() {
 
       {/* ─── LISTING MODAL ─── */}
       {showListing&&(
-        <div className={listingClosing?'slide-down':'slide-in-right'} style={{position:'fixed',inset:0,zIndex:500,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+        <div className={listingClosing?'slide-down':'slide-in-right'} style={{position:'fixed',inset:0,zIndex:500,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',overflow:'hidden'}}>
           {/* header */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,flexShrink:0,background:resolved==='light'?'#ffffff':C.bg,zIndex:5}}>
             <button onClick={closeListing} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontSize:'0.95rem',fontFamily:'inherit'}}>Cancel</button>
             <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>New Listing</span>
             <div style={{width:'60px'}}/>
@@ -1848,14 +1846,14 @@ export default function App() {
 
           {/* category picker sub-view */}
           {listingView==='cat'&&(
-            <div className="slide-in-right" style={{position:'absolute',inset:0,zIndex:10,background:resolved==='light'?'#ffffff':C.bg,overflowY:'auto'}}>
-              <div style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
+            <div className="slide-in-right" style={{position:'fixed',inset:0,zIndex:510,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
                 <button onClick={()=>setListingView(null)} style={{width:'32px',height:'32px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
                 <span style={{fontWeight:800,fontSize:'1.1rem',color:C.text}}>Select Category</span>
               </div>
-              <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',gap:'8px'}}>
+              <div style={{flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:'8px'}}>
                 {[{emoji:'👕',label:'Clothes'},{emoji:'👠',label:'Shoes'},{emoji:'🧢',label:'Hats'},{emoji:'💍',label:'Jewelry'},{emoji:'🕶️',label:'Accessories'},{emoji:'📚',label:'Books'},{emoji:'🎒',label:'School Gear'},{emoji:'📱',label:'Electronics'},{emoji:'🚲',label:'Bikes'},{emoji:'🏠',label:'Home Goods'},{emoji:'🪑',label:'Furniture'},{emoji:'🎟️',label:'Tickets'},{emoji:'❓',label:'Other'}].map(({emoji,label})=>(
-                  <button key={label} onClick={()=>{setLf(f=>({...f,cat:label}));setListingView(null)}} style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px',borderRadius:'14px',background:resolved==='light'?'#f5f5f7':C.surface,border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left' as const,width:'100%'}}>
+                  <button key={label} onClick={()=>{setLf(f=>({...f,cat:label}));setListingView(null)}} style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px',borderRadius:'14px',background:resolved==='light'?'#f5f5f7':C.surface,border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left' as const,width:'100%',flexShrink:0}}>
                     <span style={{fontSize:'1.4rem',width:'32px',textAlign:'center'}}>{emoji}</span>
                     <span style={{fontWeight:700,fontSize:'0.97rem',color:C.text,flex:1}}>{label}</span>
                     {lf.cat===label&&<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.accentBright} strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
@@ -1867,12 +1865,12 @@ export default function App() {
 
           {/* condition picker sub-view */}
           {listingView==='cond'&&(
-            <div className="slide-in-right" style={{position:'absolute',inset:0,zIndex:10,background:resolved==='light'?'#ffffff':C.bg,overflowY:'auto'}}>
-              <div style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`}}>
+            <div className="slide-in-right" style={{position:'fixed',inset:0,zIndex:510,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'14px',padding:'16px 20px',paddingTop:'calc(16px + env(safe-area-inset-top))',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
                 <button onClick={()=>setListingView(null)} style={{width:'32px',height:'32px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
                 <span style={{fontWeight:800,fontSize:'1.1rem',color:C.text}}>Select Condition</span>
               </div>
-              <div style={{padding:'12px 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
+              <div style={{flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
                 {[{label:'New',desc:'New with tags, or unopened packaging.'},{label:'Good',desc:'Gently used, few flaws, fully functional.'},{label:'Poor',desc:'Major flaws, may be damaged, or missing parts.'}].map(({label,desc})=>(
                   <button key={label} onClick={()=>{setLf(f=>({...f,condition:label}));setListingView(null)}} style={{display:'flex',flexDirection:'column' as const,alignItems:'flex-start',gap:'4px',padding:'18px',borderRadius:'14px',background:resolved==='light'?'#f5f5f7':C.surface,border:lf.condition===label?`2px solid ${C.accentBright}`:'2px solid transparent',cursor:'pointer',fontFamily:'inherit',textAlign:'left' as const,width:'100%'}}>
                     <span style={{fontWeight:800,fontSize:'1rem',color:C.text}}>{label}</span>
@@ -1884,7 +1882,7 @@ export default function App() {
           )}
 
           {/* form body */}
-          <div style={{padding:'20px 20px 40px',display:'flex',flexDirection:'column',gap:'0'}}>
+          <div style={{flex:1,overflowY:'auto',padding:'20px 20px 40px',display:'flex',flexDirection:'column',gap:'0'}}>
             {/* PHOTO */}
             <div style={{marginBottom:'24px'}}>
               <div style={{fontWeight:800,fontSize:'0.82rem',letterSpacing:'.5px',color:C.text,marginBottom:'12px'}}>PHOTO</div>
