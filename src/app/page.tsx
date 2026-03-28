@@ -186,11 +186,9 @@ export default function App() {
   const searchBackdropRef = useRef<HTMLDivElement>(null)
   const searchOverlayOpenRef = useRef(false)
   const [lightboxImg, setLightboxImg] = useState<string|null>(null)
-  const [lightboxScale, setLightboxScale] = useState(1)
-  const listingCarouselRef = useRef<HTMLDivElement>(null)
-  const carouselTouchStart = useRef({x:0,idx:0})
-  const [carouselDragX, setCarouselDragX] = useState(0)
-  const [carouselDragging, setCarouselDragging] = useState(false)
+  const carouselRef = useRef<HTMLDivElement>(null)
+  const carouselInnerRef = useRef<HTMLDivElement>(null)
+  const carouselTouchRef = useRef({startX:0,dx:0,dragging:false,startTime:0})
   const chatRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -682,12 +680,15 @@ export default function App() {
 
   useEffect(() => {
     let sx = 0, sy = 0
+    let touchOnCarousel = false
     function onTS(e: TouchEvent) {
       sx = e.touches[0].clientX
       sy = e.touches[0].clientY
       swipeLocked.current = null
+      touchOnCarousel = !!(carouselRef.current && carouselRef.current.contains(e.target as Node))
     }
     function onTM(e: TouchEvent) {
+      if (touchOnCarousel) return
       const dx = e.touches[0].clientX - sx
       const dy = e.touches[0].clientY - sy
       if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
@@ -815,6 +816,7 @@ export default function App() {
       }
     }
     async function onTE() {
+      if (touchOnCarousel) { touchOnCarousel = false; swipeLocked.current = null; swipeXRef.current = 0; return }
       if (showPostRef.current || showRepostRef.current) { swipeLocked.current = null; swipeXRef.current = 0; return }
       // Chat detail: complete swipe-back or snap back
       if (chatDetailRef.current && chatTargetRef.current) {
@@ -1052,7 +1054,7 @@ export default function App() {
           })()}
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {(p as any).repost_of&&(
-            <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'14px 14px',marginTop:'10px',background:C.bg,cursor:'pointer'}} onClick={()=>openPost((p as any).repost_of)}>
+            <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'14px 14px',marginTop:'10px',background:C.bg,cursor:'pointer'}} onClick={e=>{e.stopPropagation();openPost((p as any).repost_of)}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
                 <img src={avImg((p as any).repost_of.user_id)} alt="" style={{width:'24px',height:'24px',borderRadius:'50%',objectFit:'cover'}}/>
                 <span style={{fontSize:'0.85rem',fontWeight:700,color:C.text}}>{(p as any).repost_of.is_anon?'Anonymous':((p as any).repost_of.profiles?.username||'User')}</span>
@@ -1667,7 +1669,7 @@ export default function App() {
           {id:'market',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>},
           {id:'profile',icon:(a:boolean)=><svg width="26" height="26" viewBox="0 0 24 24" fill={a?C.text:'none'} stroke={a?C.text:C.muted} strokeWidth={a?2.8:2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
         ].map(n=>(
-          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'16px 0 6px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
+          <button key={n.id} onClick={()=>{setPage(n.id as any);window.scrollTo(0,0)}} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px 0 8px',cursor:'pointer',border:'none',background:'none',position:'relative'}}>
             <div style={{position:'relative'}}>
               {n.icon(page===n.id)}
               {(n as any).badge ? <span style={{position:'absolute',top:'-4px',right:'-6px',background:'#ef4444',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.6rem',fontWeight:700}}>{(n as any).badge}</span> : null}
@@ -1908,47 +1910,54 @@ export default function App() {
           {/* image carousel — touch-swipeable with tap-to-enlarge */}
           <div style={{padding:'0 16px 12px'}}>
             {selectedListing.images&&selectedListing.images.length>0 ? (
-              <div style={{position:'relative',width:'100%',height:'300px',borderRadius:'18px',overflow:'hidden',background:C.surface,touchAction:'pan-y'}}
+              <div ref={carouselRef} style={{position:'relative',width:'100%',height:'300px',borderRadius:'18px',overflow:'hidden',background:C.surface,touchAction:'none'}}
                 onTouchStart={e=>{
+                  e.stopPropagation()
                   const t=e.touches[0]
-                  carouselTouchStart.current={x:t.clientX,idx:listingPhotoIdx}
-                  setCarouselDragging(true)
-                  setCarouselDragX(0)
+                  carouselTouchRef.current={startX:t.clientX,dx:0,dragging:true,startTime:Date.now()}
                 }}
                 onTouchMove={e=>{
-                  if(!carouselDragging) return
-                  const dx=e.touches[0].clientX-carouselTouchStart.current.x
-                  if(Math.abs(dx)>8 && e.cancelable) e.preventDefault()
-                  setCarouselDragX(dx)
-                }}
-                onTouchEnd={()=>{
-                  if(!carouselDragging){setCarouselDragging(false);return}
-                  const threshold=50
-                  const imgs=selectedListing.images!
-                  if(carouselDragX<-threshold && listingPhotoIdx<imgs.length-1){
-                    setListingPhotoIdx(i=>i+1)
-                  } else if(carouselDragX>threshold && listingPhotoIdx>0){
-                    setListingPhotoIdx(i=>i-1)
+                  e.stopPropagation()
+                  const ct=carouselTouchRef.current
+                  if(!ct.dragging) return
+                  if(e.cancelable) e.preventDefault()
+                  const dx=e.touches[0].clientX-ct.startX
+                  ct.dx=dx
+                  if(carouselInnerRef.current){
+                    carouselInnerRef.current.style.transition='none'
+                    carouselInnerRef.current.style.transform=`translateX(calc(${-listingPhotoIdxRef.current*100}% + ${dx}px))`
                   }
-                  setCarouselDragX(0)
-                  setCarouselDragging(false)
+                }}
+                onTouchEnd={e=>{
+                  e.stopPropagation()
+                  const ct=carouselTouchRef.current
+                  if(!ct.dragging) return
+                  ct.dragging=false
+                  const velocity=Math.abs(ct.dx)/(Date.now()-ct.startTime)*1000
+                  const threshold=velocity>800?20:50
+                  const imgs=selectedListing.images!
+                  let newIdx=listingPhotoIdxRef.current
+                  if(ct.dx<-threshold && newIdx<imgs.length-1) newIdx++
+                  else if(ct.dx>threshold && newIdx>0) newIdx--
+                  setListingPhotoIdx(newIdx)
+                  if(carouselInnerRef.current){
+                    carouselInnerRef.current.style.transition='transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)'
+                    carouselInnerRef.current.style.transform=`translateX(${-newIdx*100}%)`
+                  }
+                  if(Math.abs(ct.dx)<5) setLightboxImg(imgs[newIdx])
                 }}
               >
-                <div style={{display:'flex',height:'100%',transition:carouselDragging?'none':'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)',transform:`translateX(calc(${-listingPhotoIdx*100}% + ${carouselDragging?carouselDragX:0}px))`}}>
+                <div ref={carouselInnerRef} style={{display:'flex',height:'100%',transition:'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)',transform:`translateX(${-listingPhotoIdx*100}%)`}}>
                   {selectedListing.images.map((img,i)=>(
-                    <img key={i} src={img} alt={selectedListing.title} onClick={()=>{if(Math.abs(carouselDragX)<5) setLightboxImg(img)}} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover',cursor:'pointer',userSelect:'none',WebkitUserDrag:'none'} as React.CSSProperties}/>
+                    <img key={i} src={img} alt={selectedListing.title} style={{width:'100%',flexShrink:0,height:'100%',objectFit:'cover',cursor:'pointer',userSelect:'none',pointerEvents:'none'} as React.CSSProperties} draggable={false}/>
                   ))}
                 </div>
                 {selectedListing.images.length>1&&(
-                  <>
-                    {listingPhotoIdx>0&&<button onClick={()=>setListingPhotoIdx(i=>i-1)} style={{position:'absolute',left:'8px',top:'50%',transform:'translateY(-50%)',width:'32px',height:'32px',borderRadius:'50%',background:'rgba(0,0,0,0.4)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',zIndex:3,backdropFilter:'blur(4px)'}}>‹</button>}
-                    {listingPhotoIdx<selectedListing.images.length-1&&<button onClick={()=>setListingPhotoIdx(i=>i+1)} style={{position:'absolute',right:'8px',top:'50%',transform:'translateY(-50%)',width:'32px',height:'32px',borderRadius:'50%',background:'rgba(0,0,0,0.4)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'1.1rem',zIndex:3,backdropFilter:'blur(4px)'}}>›</button>}
-                    <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
-                      {selectedListing.images.map((_,i)=>(
-                        <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
-                      ))}
-                    </div>
-                  </>
+                  <div style={{position:'absolute',bottom:'12px',left:'50%',transform:'translateX(-50%)',display:'flex',gap:'6px',zIndex:2}}>
+                    {selectedListing.images.map((_,i)=>(
+                      <div key={i} onClick={()=>setListingPhotoIdx(i)} style={{width:'7px',height:'7px',borderRadius:'50%',background:i===listingPhotoIdx?'white':'rgba(255,255,255,0.5)',cursor:'pointer',transition:'background 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.4)'}}/>
+                    ))}
+                  </div>
                 )}
                 <div style={{position:'absolute',top:'12px',right:'12px',background:'rgba(0,0,0,0.5)',borderRadius:'12px',padding:'3px 10px',fontSize:'0.75rem',color:'white',fontWeight:700,zIndex:2}}>{listingPhotoIdx+1}/{selectedListing.images.length}</div>
               </div>
