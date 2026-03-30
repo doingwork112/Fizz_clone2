@@ -490,12 +490,16 @@ export default function App() {
 
   async function sendDm(){
     if(!profile||!dmTarget||!dmMsg.trim())return
+    // Send context message first (which post the DM is from)
+    const postPreview = dmTarget.text?.slice(0,80) || ''
+    if (postPreview) {
+      await sb.from('messages').insert({from_user_id:profile.id,to_user_id:dmTarget.user_id,text:`📌 Re: "${postPreview}${dmTarget.text&&dmTarget.text.length>80?'...':''}"`,metadata:{type:'post_context',post_id:dmTarget.id}})
+    }
     await sb.from('messages').insert({from_user_id:profile.id,to_user_id:dmTarget.user_id,text:dmMsg.trim()})
     const target = {id:dmTarget.user_id,...(dmTarget.profiles as any)} as Profile
     setDmMsg('');setShowDm(false);setDmTarget(null)
     setPage('messages')
     await loadConvos()
-    // Small delay so messages page renders first, then chat slides in
     setTimeout(() => openChat(target), 60)
   }
 
@@ -1103,7 +1107,7 @@ export default function App() {
     const cmtsOpen = !!openCmts[p.id]
 
     return (
-      <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
+      <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'10px 16px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
         {/* avatar — wrapper div shows bg color while img loads, preventing flash */}
         <div style={{width:'36px',height:'36px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
           <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
@@ -1139,7 +1143,7 @@ export default function App() {
           )}
           {/* action row — matches Fizz: DM, Comment, Repost, Share, ••• */}
           {(() => { const ic = resolved==='light'?'#555':'#aaa'; return (
-          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'12px'}}>
+          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'8px',paddingBottom:'2px'}}>
             <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -2120,11 +2124,14 @@ export default function App() {
               </div>
             </>}
             {/* own listing actions */}
-            {selectedListing.user_id===profile.id&&(
+            {selectedListing.user_id===profile.id&&(<>
               <button onClick={()=>sb.from('listings').update({is_sold:true}).eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})} style={{marginTop:'20px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:'14px',color:C.muted,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                 Mark as Sold
               </button>
-            )}
+              <button onClick={()=>{if(!confirm('确认删除此商品？'))return;sb.from('listings').delete().eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})}} style={{marginTop:'10px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.red}`,borderRadius:'14px',color:C.red,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                Delete Listing
+              </button>
+            </>)}
           </div>
         </div>
       </>)}
@@ -2294,7 +2301,7 @@ export default function App() {
               )
             })}
           </div>
-          <div style={{borderTop:'1px solid '+C.border,background:C.bg}}>
+          <div style={{borderTop:'1px solid '+C.border,background:C.bg,flexShrink:0}}>
             {replyToComment&&(
               <div style={{padding:'6px 16px 0',display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:'0.8rem',color:C.muted}}>
                 <span>↩ Replying to Anonymous</span>
@@ -2306,7 +2313,7 @@ export default function App() {
                 {cmtPrevs.map((p,i)=><img key={i} src={p} alt="" style={{height:'60px',width:'60px',objectFit:'cover',borderRadius:'8px',flexShrink:0}}/>)}
               </div>
             )}
-            <div style={{padding:'8px 16px',paddingBottom:`calc(8px + 34px + env(safe-area-inset-bottom, 0px))`,display:'flex',gap:'8px',alignItems:'center'}}>
+            <div style={{padding:'8px 16px',paddingBottom:`calc(8px + env(safe-area-inset-bottom, 0px))`,display:'flex',gap:'8px',alignItems:'center'}}>
               <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',flexShrink:0}}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
                 <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickCmtImgs} />
