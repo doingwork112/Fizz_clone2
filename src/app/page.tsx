@@ -1204,8 +1204,25 @@ export default function App() {
     )
   }
 
+  // ── SPLASH ──
+  if (showSplash) return (
+    <div className="splash-bg" style={{position:'fixed',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:9999,overflow:'hidden'}}>
+      {splashZoom && <div className="splash-flash" style={{position:'absolute',inset:0,background:'white',zIndex:2,pointerEvents:'none'}}/>}
+      <img
+        src="/logo-main.jpg"
+        alt="heha"
+        className={splashZoom ? 'splash-logo-zoom' : 'splash-logo-in'}
+        style={{width:'90px',height:'90px',borderRadius:'22px',objectFit:'cover',position:'relative',zIndex:1}}
+      />
+      {!splashZoom && (
+        <div className="splash-logo-in" style={{marginTop:'20px',color:'white',fontSize:'1.5rem',fontWeight:900,letterSpacing:'0.15em',fontFamily:"'Nunito',sans-serif",animationDelay:'0.15s',opacity:0}}>
+          HEHA
+        </div>
+      )}
+    </div>
+  )
+
   // ── AUTH ──
-  if (showSplash) return null
   if (!session||!profile) return (
     <div style={{minHeight:'100vh',background:C.bg,color:C.text,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',gap:'20px',fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif"}}>
       <div style={{fontFamily:'Nunito,sans-serif',fontWeight:900,fontSize:'2.8rem',color:C.accentBright,letterSpacing:'-1px'}}>heha</div>
@@ -1261,26 +1278,6 @@ export default function App() {
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px 10px',background:C.bg,position:'sticky',top:0,zIndex:100,...(noBorder?{}:{borderBottom:`1px solid ${C.border}`})}}>
       <div style={{fontWeight:700,fontSize:'1.05rem',display:'flex',alignItems:'center',gap:'8px'}}>{title}</div>
       {right}
-    </div>
-  )
-
-  if (showSplash) return (
-    <div className="splash-bg" style={{position:'fixed',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:9999,overflow:'hidden'}}>
-      {/* White flash overlay during zoom */}
-      {splashZoom && <div className="splash-flash" style={{position:'absolute',inset:0,background:'white',zIndex:2,pointerEvents:'none'}}/>}
-      {/* Logo */}
-      <img
-        src="/logo-main.jpg"
-        alt="heha"
-        className={splashZoom ? 'splash-logo-zoom' : 'splash-logo-in'}
-        style={{width:'90px',height:'90px',borderRadius:'22px',objectFit:'cover',position:'relative',zIndex:1}}
-      />
-      {/* App name */}
-      {!splashZoom && (
-        <div className="splash-logo-in" style={{marginTop:'20px',color:'white',fontSize:'1.5rem',fontWeight:900,letterSpacing:'0.15em',fontFamily:"'Nunito',sans-serif",animationDelay:'0.15s',opacity:0}}>
-          HEHA
-        </div>
-      )}
     </div>
   )
 
