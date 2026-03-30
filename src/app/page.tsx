@@ -357,7 +357,16 @@ export default function App() {
     setPostPrevs(files.map(f=>URL.createObjectURL(f)))
   }
 
-  async function deletePst(id:string) { if(!confirm('确认删除？'))return; await sb.from('posts').delete().eq('id',id); loadPosts() }
+  async function deletePst(id:string) {
+    const { error } = await sb.from('posts').delete().eq('id',id)
+    if (error) {
+      console.error('Delete post error:', error)
+      alert('删除失败: ' + error.message)
+      return
+    }
+    setPosts(prev => prev.filter(p => p.id !== id))
+    if (selectedPost && (selectedPost as any).id === id) { setSelectedPost(null) }
+  }
 
   async function toggleCmts(pid:string) {
     if (openCmts[pid]) { const c={...openCmts}; delete c[pid]; setOpenCmts(c) }
@@ -2128,7 +2137,7 @@ export default function App() {
               <button onClick={()=>sb.from('listings').update({is_sold:true}).eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})} style={{marginTop:'20px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.border}`,borderRadius:'14px',color:C.muted,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                 Mark as Sold
               </button>
-              <button onClick={()=>{if(!confirm('确认删除此商品？'))return;sb.from('listings').delete().eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})}} style={{marginTop:'10px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.red}`,borderRadius:'14px',color:C.red,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+              <button onClick={()=>{sb.from('listings').delete().eq('id',selectedListing.id).then(({error})=>{if(error){alert('删除失败: '+error.message);return}loadListings();setSelectedListing(null)})}} style={{marginTop:'10px',width:'100%',padding:'14px',background:'transparent',border:`1.5px solid ${C.red}`,borderRadius:'14px',color:C.red,fontSize:'0.9rem',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
                 Delete Listing
               </button>
             </>)}
