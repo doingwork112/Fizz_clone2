@@ -51,8 +51,16 @@ export default function App() {
 
   // Splash screen: logo sits for 1.4s, then zooms out in 0.45s, then cuts to app
   useEffect(() => {
+    // Set html/body to purple so status bar area matches splash
+    document.documentElement.style.background = '#4c1d95'
+    document.body.style.background = '#4c1d95'
     const zoomTimer = setTimeout(() => setSplashZoom(true), 1400)
-    const hideTimer = setTimeout(() => setShowSplash(false), 1850)
+    const hideTimer = setTimeout(() => {
+      setShowSplash(false)
+      // Restore normal background after splash
+      document.documentElement.style.background = ''
+      document.body.style.background = ''
+    }, 1850)
     return () => { clearTimeout(zoomTimer); clearTimeout(hideTimer) }
   }, [])
 
