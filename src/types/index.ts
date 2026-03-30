@@ -74,6 +74,12 @@ export interface Event {
   has_going?: boolean
 }
 
+export interface MessageMetadata {
+  type?: 'post_context'
+  post_id?: string
+  post_preview?: string
+}
+
 export interface Message {
   id: string
   from_user_id: string
@@ -81,6 +87,7 @@ export interface Message {
   text: string
   is_read: boolean
   created_at: string
+  metadata?: MessageMetadata | null
   from_profile?: Profile
   to_profile?: Profile
 }

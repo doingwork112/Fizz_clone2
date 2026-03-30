@@ -26,8 +26,8 @@ function useTheme() {
   return { theme, setTheme, resolved }
 }
 
-const LIGHT = { bg:'#ffffff', surface:'#f5f5f5', surface2:'#ebebeb', border:'#e8e8e8', text:'#111111', muted:'#8e8e93', card:'#ffffff', accent:'#1a3a5c', accentBright:'#2563eb', upvote:'#2563eb', red:'#ef4444', green:'#16a34a', shadow:'rgba(0,0,0,0.08)' }
-const DARK =  { bg:'#0f0f13', surface:'#18181f', surface2:'#222230', border:'#2e2e3f', text:'#e8e8f0', muted:'#888899', card:'#1e1e28', accent:'#1a3a5c', accentBright:'#7c6ff7', upvote:'#7c6ff7', red:'#f76f6f', green:'#4cd9a0', shadow:'rgba(0,0,0,0.4)' }
+const LIGHT = { bg:'#fff9f0', surface:'#fff4e4', surface2:'#ffe7c7', border:'#f2d3a6', text:'#22160b', muted:'#8d7662', card:'#fffdf9', accent:'#ff8a3d', accentBright:'#2151ff', upvote:'#2151ff', red:'#df4c35', green:'#1d9b63', shadow:'rgba(122,63,11,0.10)' }
+const DARK =  { bg:'#17110d', surface:'#231913', surface2:'#2f2119', border:'#4e3827', text:'#fff5ea', muted:'#c0ab98', card:'#201711', accent:'#ff9d57', accentBright:'#7aa2ff', upvote:'#7aa2ff', red:'#ff7f66', green:'#49ca89', shadow:'rgba(0,0,0,0.42)' }
 
 const ANON_EMOJIS = ['🦊','🐧','🎩','🦄','🌈','🔮','🎪','🦋','🌊','🎭','🐻','🦁']
 const AV_COLORS = ['#1a3a5c','#2563eb','#7c3aed','#0891b2','#15803d','#b45309','#be123c','#0f766e']
@@ -43,6 +43,21 @@ function ago(ts: string) {
 function anonEmoji(uid: string) { return ANON_EMOJIS[uid.charCodeAt(0) % ANON_EMOJIS.length] }
 function avColor(uid: string) { return AV_COLORS[uid.charCodeAt(0) % AV_COLORS.length] }
 function avImg(uid: string) { return AV_LOGOS[uid.charCodeAt(0) % AV_LOGOS.length] }
+function splitTaggedText(text: string) {
+  const firstLine = text.split('\n')[0]
+  const maybeTag = firstLine && firstLine === firstLine.toUpperCase() ? firstLine : ''
+  return { tagLine: maybeTag, body: maybeTag ? text.slice(firstLine.length).trim() : text }
+}
+function trimPreview(text: string, max = 80) {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (!clean) return ''
+  return clean.length > max ? `${clean.slice(0, max)}...` : clean
+}
+function formatMessagePreview(msg?: Message) {
+  if (!msg) return '开始对话'
+  if (msg.metadata?.type === 'post_context') return `来自帖子: ${msg.metadata.post_preview || '查看原帖'}`
+  return msg.text || '开始对话'
+}
 
 export default function App() {
   const sb = createClient()
@@ -66,7 +81,7 @@ export default function App() {
 
   // Sync html/body background with theme so no dark flash behind keyboard
   useEffect(() => {
-    const bg = resolved === 'light' ? '#ffffff' : '#0f0f13'
+    const bg = resolved === 'light' ? LIGHT.bg : DARK.bg
     document.documentElement.style.background = bg
     document.body.style.background = bg
   }, [resolved])
@@ -116,6 +131,9 @@ export default function App() {
   const [repostOriginalPostText, setRepostOriginalPostText] = useState('')
   const [selectedMsg, setSelectedMsg] = useState<any>(null)
   const [showChatMenu, setShowChatMenu] = useState(false)
+  const [showListingMenu, setShowListingMenu] = useState(false)
+  const [pendingChat, setPendingChat] = useState<{ user: Profile; tab: 'posts' | 'market' } | null>(null)
+  const [keyboardInset, setKeyboardInset] = useState(0)
 
   const [showSplash, setShowSplash] = useState(true)
   const [splashZoom, setSplashZoom] = useState(false)
@@ -214,6 +232,10 @@ export default function App() {
   const carouselInnerRef = useRef<HTMLDivElement>(null)
   const carouselTouchRef = useRef({startX:0,dx:0,dragging:false,startTime:0})
   const chatRef = useRef<HTMLDivElement>(null)
+  const postDetailScrollRef = useRef<HTMLDivElement>(null)
+  const commentInputRef = useRef<HTMLInputElement>(null)
+  const chatInputRef = useRef<HTMLInputElement>(null)
+  const dmInputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -255,6 +277,30 @@ export default function App() {
     const iv = setInterval(()=>presence(profile),120000)
     return ()=>{ sb.removeChannel(ch); sb.removeChannel(mch); clearInterval(iv) }
   }, [profile?.id])
+  useEffect(() => {
+    if (page !== 'messages' || !pendingChat) return
+    const timer = window.setTimeout(() => {
+      setMsgTab(pendingChat.tab)
+      openChat(pendingChat.user)
+      setPendingChat(null)
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [page, pendingChat])
+  useEffect(() => {
+    if (!window.visualViewport) return
+    const updateInset = () => {
+      const viewport = window.visualViewport
+      const nextInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+      setKeyboardInset(nextInset > 80 ? nextInset : 0)
+    }
+    updateInset()
+    window.visualViewport.addEventListener('resize', updateInset)
+    window.visualViewport.addEventListener('scroll', updateInset)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateInset)
+      window.visualViewport?.removeEventListener('scroll', updateInset)
+    }
+  }, [])
 
   async function handleLogin() {
     setAuthLoading(true); setAuthErr('')
@@ -358,14 +404,27 @@ export default function App() {
   }
 
   async function deletePst(id:string) {
-    const { error } = await sb.from('posts').delete().eq('id',id)
+    if (!confirm('确认删除这条帖子吗？')) return
+    const { data: reposts } = await sb.from('posts').select('id').eq('repost_of_id', id)
+    const postIds = [id, ...(reposts?.map((post:any) => post.id) || [])]
+    const { data: comments } = await sb.from('comments').select('id').in('post_id', postIds)
+    const commentIds = comments?.map((comment:any) => comment.id) || []
+    if (commentIds.length > 0) {
+      await sb.from('comment_votes').delete().in('comment_id', commentIds)
+    }
+    await sb.from('comments').delete().in('post_id', postIds)
+    await sb.from('fizzups').delete().in('post_id', postIds)
+    const { error } = await sb.from('posts').delete().in('id', postIds)
     if (error) {
       console.error('Delete post error:', error)
       alert('删除失败: ' + error.message)
       return
     }
-    setPosts(prev => prev.filter(p => p.id !== id))
-    if (selectedPost && (selectedPost as any).id === id) { setSelectedPost(null) }
+    setPosts(prev => prev.filter(p => !postIds.includes(p.id)))
+    if (selectedPost && postIds.includes((selectedPost as any).id)) {
+      setSelectedPost(null)
+      setPostComments([])
+    }
   }
 
   async function toggleCmts(pid:string) {
@@ -499,17 +558,22 @@ export default function App() {
 
   async function sendDm(){
     if(!profile||!dmTarget||!dmMsg.trim())return
-    // Send context message first (which post the DM is from)
-    const postPreview = dmTarget.text?.slice(0,80) || ''
+    const { body } = splitTaggedText(dmTarget.text || '')
+    const postPreview = trimPreview(body || dmTarget.text || '', 80)
     if (postPreview) {
-      await sb.from('messages').insert({from_user_id:profile.id,to_user_id:dmTarget.user_id,text:`📌 Re: "${postPreview}${dmTarget.text&&dmTarget.text.length>80?'...':''}"`,metadata:{type:'post_context',post_id:dmTarget.id}})
+      await sb.from('messages').insert({
+        from_user_id:profile.id,
+        to_user_id:dmTarget.user_id,
+        text:'📌 来自帖子',
+        metadata:{type:'post_context',post_id:dmTarget.id,post_preview:postPreview}
+      })
     }
     await sb.from('messages').insert({from_user_id:profile.id,to_user_id:dmTarget.user_id,text:dmMsg.trim()})
     const target = {id:dmTarget.user_id,...(dmTarget.profiles as any)} as Profile
     setDmMsg('');setShowDm(false);setDmTarget(null)
+    setPendingChat({ user: target, tab: 'posts' })
     setPage('messages')
     await loadConvos()
-    setTimeout(() => openChat(target), 60)
   }
 
   async function loadConvos() {
@@ -539,6 +603,7 @@ export default function App() {
   }
   async function openChat(u:Profile) {
     setChatTarget(u)
+    setShowChatMenu(false)
     const { data } = await sb.from('messages').select('*').or(`and(from_user_id.eq.${profile!.id},to_user_id.eq.${u.id}),and(from_user_id.eq.${u.id},to_user_id.eq.${profile!.id})`).order('created_at')
     setChatMsgs(data||[])
     await sb.from('messages').update({is_read:true}).eq('to_user_id',profile!.id).eq('from_user_id',u.id)
@@ -571,6 +636,7 @@ export default function App() {
   }
   useEffect(()=>{ chatRef.current?.scrollTo(0,chatRef.current.scrollHeight) },[chatMsgs])
   useEffect(() => { setListingPhotoIdx(0) }, [selectedListing?.id])
+  useEffect(() => { setShowListingMenu(false) }, [selectedListing?.id])
 
   // Lock body scroll on iOS — position:fixed is the only reliable method for PWA
   // Post/repost modal: prevent background scroll via backdrop touchmove preventDefault
@@ -1114,9 +1180,13 @@ export default function App() {
     const mv = (p as any).my_vote
     const score = p.likes_count - (p.dislikes_count||0)
     const cmtsOpen = !!openCmts[p.id]
+    const { tagLine, body } = splitTaggedText(p.text)
+    const matchTag = POST_TAGS.find(t => t.tag === tagLine)
+    const commentCount = p.comments_count || 0
+    const repostCount = (p as any).reposts_count || 0
 
     return (
-      <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'10px 16px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
+      <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px 10px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
         {/* avatar — wrapper div shows bg color while img loads, preventing flash */}
         <div style={{width:'36px',height:'36px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(p.user_id)}}>
           <img src={avImg(p.user_id)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
@@ -1128,16 +1198,8 @@ export default function App() {
             <span style={{color:C.muted,fontSize:'0.8rem'}}>{ago(p.created_at)}</span>
             {p.is_hot && <span style={{background:'#fef3c7',color:'#d97706',borderRadius:'4px',padding:'1px 6px',fontSize:'0.68rem',fontWeight:700}}>🔥 HOT</span>}
           </div>
-          {(() => {
-            // Check if post starts with a known tag
-            const tagLine = p.text.split('\n')[0]
-            const matchTag = POST_TAGS.find(t => t.tag === tagLine)
-            const displayText = matchTag ? p.text.slice(tagLine.length).trim() : p.text
-            return <>
-              {matchTag && <span style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'3px 10px',borderRadius:'16px',fontSize:'0.72rem',fontWeight:800,marginBottom:'4px',background:matchTag.bg,color:matchTag.color}}>{matchTag.emoji} {matchTag.tag}</span>}
-              <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{displayText}</div>
-            </>
-          })()}
+          {matchTag && <span style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'3px 10px',borderRadius:'16px',fontSize:'0.72rem',fontWeight:800,marginBottom:'6px',background:matchTag.bg,color:matchTag.color}}>{matchTag.emoji} {matchTag.tag}</span>}
+          <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{body}</div>
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {(p as any).repost_of&&(
             <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'14px 14px',marginTop:'10px',background:C.bg,cursor:'pointer'}} onClick={e=>{e.stopPropagation();openPost((p as any).repost_of)}}>
@@ -1152,17 +1214,17 @@ export default function App() {
           )}
           {/* action row — matches Fizz: DM, Comment, Repost, Share, ••• */}
           {(() => { const ic = resolved==='light'?'#555':'#aaa'; return (
-          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'8px',paddingBottom:'2px'}}>
+          <div onClick={e=>e.stopPropagation()} style={{display:'flex',alignItems:'center',gap:'16px',marginTop:'6px',paddingBottom:0}}>
             <button onClick={()=>{setDmTarget(p);setShowDm(true)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
             <button onClick={()=>openPost(p)} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:ic,cursor:'pointer',fontSize:'0.88rem',fontWeight:700,padding:0,fontFamily:'inherit'}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-              {p.comments_count||''}
+              {commentCount > 0 ? commentCount : null}
             </button>
             <button onClick={()=>{setRepostTarget(p);setShowRepost(true)}} style={{display:'flex',alignItems:'center',gap:'5px',background:'none',border:'none',color:ic,cursor:'pointer',fontSize:'0.88rem',fontWeight:700,padding:0,fontFamily:'inherit'}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-              {(p as any).reposts_count||''}
+              {repostCount > 0 ? repostCount : null}
             </button>
             <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
@@ -1304,7 +1366,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Manrope','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none',backgroundImage:resolved==='light'?'radial-gradient(circle at top, rgba(255,138,61,0.12), transparent 28%)':'radial-gradient(circle at top, rgba(255,157,87,0.14), transparent 22%)'}}
     >
 
       {/* ─── FEED ─── */}
@@ -1365,7 +1427,7 @@ export default function App() {
             <img src={avImg(u.id)} alt="" style={{width:'46px',height:'46px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:700,fontSize:'0.95rem'}}>Anonymous</div>
-              <div style={{fontSize:'0.85rem',color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lastMsg?.text||'开始对话'}</div>
+              <div style={{fontSize:'0.85rem',color:C.muted,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{formatMessagePreview(lastMsg)}</div>
             </div>
             {lastMsg&&<div style={{fontSize:'0.75rem',color:C.muted,flexShrink:0}}>{ago(lastMsg.created_at)}</div>}
           </div>
@@ -1391,9 +1453,18 @@ export default function App() {
                 const mine = m.from_user_id===profile.id
                 const canRecall = mine && (Date.now()-new Date(m.created_at).getTime()) < 2*60*1000
                 const isSel = selectedMsg?.id===m.id
+                const isPostContext = m.metadata?.type === 'post_context'
                 return (
                   <div key={m.id} style={{alignSelf:mine?'flex-end':'flex-start',maxWidth:'76%'}}>
-                    <div onClick={e=>{e.stopPropagation();mine&&setSelectedMsg(isSel?null:m)}} style={{padding:'10px 14px',borderRadius:'18px',fontSize:'0.92rem',lineHeight:'1.4',background:mine?C.accentBright:(resolved==='light'?'#e5e7eb':C.surface2),color:mine?'white':C.text,borderBottomRightRadius:mine?'4px':'18px',borderBottomLeftRadius:mine?'18px':'4px',cursor:mine?'pointer':'default'}}>{m.text}</div>
+                    <div onClick={e=>{e.stopPropagation();mine&&setSelectedMsg(isSel?null:m)}} style={{padding:isPostContext?'12px':'10px 14px',borderRadius:'18px',fontSize:'0.92rem',lineHeight:'1.4',background:isPostContext?(resolved==='light'?'#fff1de':'#2d2118'):(mine?C.accentBright:(resolved==='light'?'#e5e7eb':C.surface2)),color:mine&&!isPostContext?'white':C.text,border:isPostContext?`1px solid ${C.border}`:'none',borderBottomRightRadius:mine&&!isPostContext?'4px':'18px',borderBottomLeftRadius:mine?'18px':'4px',cursor:mine?'pointer':'default'}}>
+                      {isPostContext ? (
+                        <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
+                          <div style={{fontSize:'0.72rem',fontWeight:800,color:C.accentBright,textTransform:'uppercase',letterSpacing:'0.04em'}}>Post Context</div>
+                          <div style={{fontSize:'0.9rem',fontWeight:700}}>来自这条帖子</div>
+                          <div style={{fontSize:'0.86rem',color:C.muted}}>{m.metadata?.post_preview || '查看原帖'}</div>
+                        </div>
+                      ) : m.text}
+                    </div>
                     <div style={{fontSize:'0.7rem',color:C.muted,marginTop:'3px',textAlign:mine?'right':'left'}}>{ago(m.created_at)}</div>
                     {isSel&&mine&&(
                       <div style={{display:'flex',justifyContent:'flex-end',marginTop:'4px',gap:'6px'}}>
@@ -1406,9 +1477,9 @@ export default function App() {
               })}
               {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
             </div>
-            <div style={{padding:'10px 12px',paddingBottom:'calc(10px + env(safe-area-inset-bottom))',flexShrink:0,background:C.bg,zIndex:10,borderTop:`1px solid ${C.border}`}}>
+            <div style={{padding:'10px 12px',paddingBottom:`calc(${10 + keyboardInset}px + env(safe-area-inset-bottom))`,flexShrink:0,background:C.bg,zIndex:10,borderTop:`1px solid ${C.border}`}}>
               <div style={{display:'flex',gap:'8px',alignItems:'center',background:resolved==='light'?'rgba(240,240,240,0.85)':'rgba(255,255,255,0.08)',backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',borderRadius:'24px',padding:'6px 6px 6px 16px'}}>
-                <input style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
+                <input ref={chatInputRef} style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
                 <button onClick={sendMsg} style={{width:'36px',height:'36px',borderRadius:'50%',background:C.accentBright,color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 </button>
@@ -2016,9 +2087,23 @@ export default function App() {
           {/* top bar */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',paddingTop:'calc(14px + env(safe-area-inset-top))'}}>
             <button onClick={closeListingDetail} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>‹</button>
-            <button style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-            </button>
+            <div style={{position:'relative'}}>
+              <button onClick={()=>setShowListingMenu(v=>!v)} style={{width:'36px',height:'36px',borderRadius:'50%',background:resolved==='light'?'rgba(0,0,0,0.07)':C.surface2,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:C.text}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+              </button>
+              {showListingMenu && (
+                <div style={{position:'absolute',top:'42px',right:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:'14px',boxShadow:`0 12px 28px ${C.shadow}`,overflow:'hidden',minWidth:'170px',zIndex:3}}>
+                  {selectedListing.user_id===profile.id ? (
+                    <>
+                      <button onClick={()=>{setShowListingMenu(false);sb.from('listings').update({is_sold:true}).eq('id',selectedListing.id).then(()=>{loadListings();setSelectedListing(null)})}} style={{width:'100%',padding:'12px 14px',background:'none',border:'none',cursor:'pointer',color:C.text,textAlign:'left',fontFamily:'inherit',fontWeight:700}}>Mark as Sold</button>
+                      <button onClick={()=>{setShowListingMenu(false);sb.from('listings').delete().eq('id',selectedListing.id).then(({error})=>{if(error){alert('删除失败: '+error.message);return}loadListings();setSelectedListing(null)})}} style={{width:'100%',padding:'12px 14px',background:'none',border:'none',borderTop:`1px solid ${C.border}`,cursor:'pointer',color:C.red,textAlign:'left',fontFamily:'inherit',fontWeight:700}}>Delete Listing</button>
+                    </>
+                  ) : (
+                    <button onClick={()=>setShowListingMenu(false)} style={{width:'100%',padding:'12px 14px',background:'none',border:'none',cursor:'pointer',color:C.text,textAlign:'left',fontFamily:'inherit',fontWeight:700}}>Report Listing</button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {/* image carousel — touch-swipeable with tap-to-enlarge */}
           <div style={{padding:'0 16px 12px'}}>
@@ -2098,7 +2183,7 @@ export default function App() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill={savedListings.includes(selectedListing.id)?C.text:'none'} stroke={C.text} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
                 {savedListings.includes(selectedListing.id)?'Saved':'Save for later'}
               </button>
-              <button onClick={()=>{ if(selectedListing.profiles){ const pid=(selectedListing.profiles as any).id||selectedListing.user_id; setMktConvoPartners(p=>{const n=p.includes(pid)?p:[...p,pid];localStorage.setItem('heha_mkt_convos',JSON.stringify(n));return n}); setSelectedListing(null); setPage('messages'); setMsgTab('market'); setTimeout(()=>openChat(selectedListing.profiles as Profile),60)} }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:'#6C2BD9',color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
+              <button onClick={()=>{ if(selectedListing.profiles){ const pid=(selectedListing.profiles as any).id||selectedListing.user_id; setMktConvoPartners(p=>{const n=p.includes(pid)?p:[...p,pid];localStorage.setItem('heha_mkt_convos',JSON.stringify(n));return n}); setPendingChat({ user: selectedListing.profiles as Profile, tab: 'market' }); setSelectedListing(null); setPage('messages'); setMsgTab('market') } }} style={{flex:1.4,display:'flex',alignItems:'center',justifyContent:'center',gap:'7px',padding:'13px',borderRadius:'28px',border:'none',background:C.accentBright,color:'white',fontWeight:700,fontSize:'0.95rem',cursor:'pointer',fontFamily:'inherit'}}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 Message Seller
               </button>
@@ -2220,7 +2305,7 @@ export default function App() {
             <button onClick={closeDetail} style={{background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',cursor:'pointer',borderRadius:'50%',width:'32px',height:'32px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',color:C.text}}>←</button>
             <span style={{fontWeight:700}}>Post</span>
           </div>
-          <div style={{flex:1,overflowY:'auto' as const}}>
+          <div ref={postDetailScrollRef} style={{flex:1,overflowY:'auto' as const,WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',minHeight:0}}>
             <div style={{padding:'16px',borderBottom:'1px solid '+C.border}}>
               <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
                 <div style={{width:'40px',height:'40px',borderRadius:'50%',overflow:'hidden',flexShrink:0,background:avColor(selectedPost.user_id)}}>
@@ -2231,7 +2316,16 @@ export default function App() {
                   <div style={{fontSize:'0.78rem',color:C.muted}}>{ago(selectedPost.created_at)}</div>
                 </div>
               </div>
-              {selectedPost.text&&<div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'12px'}}>{selectedPost.text}</div>}
+              {(() => {
+                const { tagLine, body } = splitTaggedText(selectedPost.text || '')
+                const detailTag = POST_TAGS.find(t => t.tag === tagLine)
+                return (
+                  <>
+                    {detailTag && <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'4px 11px',borderRadius:'999px',fontSize:'0.76rem',fontWeight:800,marginBottom:'10px',background:detailTag.bg,color:detailTag.color}}>{detailTag.emoji} {detailTag.tag}</div>}
+                    {body && <div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'12px'}}>{body}</div>}
+                  </>
+                )
+              })()}
               {(selectedPost as any).images&&(selectedPost as any).images.length>0&&(
                 <div style={{display:'grid',gridTemplateColumns:(selectedPost as any).images.length===1?'1fr':'1fr 1fr',gap:'3px',borderRadius:'12px',overflow:'hidden',marginBottom:'12px'}}>
                   {(selectedPost as any).images.slice(0,4).map((url:string,i:number)=><img key={i} src={url} alt="" style={{width:'100%',height:(selectedPost as any).images.length===1?'260px':'150px',objectFit:'cover' as const}}/>)}
@@ -2322,12 +2416,12 @@ export default function App() {
                 {cmtPrevs.map((p,i)=><img key={i} src={p} alt="" style={{height:'60px',width:'60px',objectFit:'cover',borderRadius:'8px',flexShrink:0}}/>)}
               </div>
             )}
-            <div style={{padding:'8px 16px',paddingBottom:`calc(8px + env(safe-area-inset-bottom, 0px))`,display:'flex',gap:'8px',alignItems:'center'}}>
+            <div style={{padding:'8px 16px',paddingBottom:`calc(${8 + keyboardInset}px + env(safe-area-inset-bottom, 0px))`,display:'flex',gap:'8px',alignItems:'center'}}>
               <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',flexShrink:0}}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
                 <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={pickCmtImgs} />
               </label>
-              <input style={{flex:1,background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder={replyToComment?`Reply to ${replyToComment.profiles?.username||'User'}…`:"Add a comment..."} value={cmtInput} onChange={e=>setCmtInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitNewCmt()} />
+              <input ref={commentInputRef} style={{flex:1,background:resolved==='light'?'#f0f0f0':C.surface2,border:'none',borderRadius:'24px',padding:'10px 16px',color:C.text,fontFamily:'inherit',fontSize:'0.9rem',outline:'none'}} placeholder={replyToComment?`Reply to ${replyToComment.profiles?.username||'User'}…`:"Add a comment..."} value={cmtInput} onChange={e=>setCmtInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitNewCmt()} />
               <button onClick={submitNewCmt} style={{padding:'10px 18px',background:C.accentBright,color:'white',border:'none',borderRadius:'24px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>Post</button>
             </div>
           </div>
@@ -2410,7 +2504,7 @@ export default function App() {
 
       {showDm&&dmTarget&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:500,display:'flex',flexDirection:'column' as const,justifyContent:'flex-end'}} onClick={e=>e.target===e.currentTarget&&setShowDm(false)}>
-          <div className="slide-up" style={{background:resolved==='light'?'rgba(255,255,255,0.88)':'rgba(30,30,40,0.88)',backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderRadius:'20px 20px 0 0',padding:'20px 16px',paddingBottom:'calc(16px + env(safe-area-inset-bottom))'}}>
+          <div className="slide-up" style={{background:resolved==='light'?'rgba(255,255,255,0.88)':'rgba(30,30,40,0.88)',backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',borderRadius:'20px 20px 0 0',padding:'20px 16px',paddingBottom:`calc(${16 + keyboardInset}px + env(safe-area-inset-bottom))`}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
               <button onClick={()=>{setShowDm(false);setDmMsg('')}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontWeight:600,fontFamily:'inherit'}}>Cancel</button>
               <div style={{fontWeight:700}}>Send Message</div>
@@ -2418,10 +2512,11 @@ export default function App() {
             </div>
             <div style={{background:resolved==='light'?'rgba(0,0,0,0.04)':'rgba(255,255,255,0.06)',borderRadius:'12px',padding:'12px',marginBottom:'14px',borderLeft:'3px solid '+C.accentBright}}>
               <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'4px'}}>To: {dmTarget.is_anon?'Anonymous':(dmTarget.profiles?.username||'User')}</div>
-              <div style={{fontSize:'0.9rem'}}>{dmTarget.text?.slice(0,100)}</div>
+              <div style={{fontSize:'0.76rem',fontWeight:800,color:C.accentBright,marginBottom:'6px'}}>From post</div>
+              <div style={{fontSize:'0.9rem'}}>{trimPreview(splitTaggedText(dmTarget.text || '').body || dmTarget.text || '', 100)}</div>
             </div>
             <div style={{background:resolved==='light'?'rgba(240,240,240,0.8)':'rgba(255,255,255,0.06)',borderRadius:'20px',padding:'4px 4px 4px 16px',display:'flex',alignItems:'flex-end',gap:'8px'}}>
-              <textarea style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontFamily:'inherit',fontSize:'0.95rem',minHeight:'36px',maxHeight:'120px',resize:'none' as const,lineHeight:'1.5',padding:'8px 0'}} placeholder="Write a message..." value={dmMsg} onChange={e=>setDmMsg(e.target.value)} autoFocus />
+              <textarea ref={dmInputRef} style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontFamily:'inherit',fontSize:'0.95rem',minHeight:'36px',maxHeight:'120px',resize:'none' as const,lineHeight:'1.5',padding:'8px 0'}} placeholder="Write a message..." value={dmMsg} onChange={e=>setDmMsg(e.target.value)} autoFocus />
               <button onClick={sendDm} disabled={!dmMsg.trim()} style={{width:'36px',height:'36px',borderRadius:'50%',background:dmMsg.trim()?C.accentBright:(resolved==='light'?'#ddd':'#444'),color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginBottom:'2px'}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
