@@ -179,3 +179,31 @@ body.modal-open {
   border-radius: 10px;
   transition: width 0.4s;
 }
+
+/* ── Splash Screen ── */
+@keyframes splashBg {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes splashLogoIn {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes splashLogoZoom {
+  0%   { transform: scale(1);  opacity: 1; }
+  100% { transform: scale(14); opacity: 0; }
+}
+@keyframes splashFlash {
+  0%   { opacity: 0; }
+  60%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+.splash-bg {
+  background: linear-gradient(135deg, #3b0764, #6d28d9, #7c3aed, #4c1d95, #1e1b4b);
+  background-size: 300% 300%;
+  animation: splashBg 4s ease infinite;
+}
+.splash-logo-in  { animation: splashLogoIn  0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+.splash-logo-zoom { animation: splashLogoZoom 0.45s cubic-bezier(0.4,0,1,1) forwards; }
+.splash-flash    { animation: splashFlash 0.45s ease forwards; }
