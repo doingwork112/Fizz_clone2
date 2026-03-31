@@ -63,6 +63,14 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(Math.max(n, min), max)
 }
 
+function formatChatDay(ts: string) {
+  return new Date(ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+}
+
+function formatBubbleTime(ts: string) {
+  return new Date(ts).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
 export default function App() {
   const sb = createClient()
   const { theme, setTheme, resolved } = useTheme()
@@ -1544,55 +1552,77 @@ export default function App() {
         {/* Chat detail — fixed overlay, slides in from right like post detail */}
         {chatTarget&&(<>
           <div ref={chatBackdropRef} className="fade-in" style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.32)',pointerEvents:'none'}}/>
-          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:C.bg,display:'flex',flexDirection:'column',overflow:'hidden',overscrollBehavior:'contain'}}>
-            <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))',background:C.bg,zIndex:10,flexShrink:0}}>
-              <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:'1.3rem',padding:0}}>←</button>
-              <img src={avImg(chatTarget.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
-              <div style={{fontWeight:700,flex:1}}>Anonymous</div>
-              <button onClick={()=>setShowChatMenu(v=>!v)} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'1.2rem',padding:'4px'}}>•••</button>
+          <div ref={chatDetailRef} className="slide-in-right" style={{position:'fixed',inset:0,zIndex:300,background:'#ffffff',display:'flex',flexDirection:'column',overflow:'hidden',overscrollBehavior:'contain'}}>
+            {(() => {
+              const contextMsg = [...chatMsgs].find(m => m.metadata?.type === 'post_context')
+              const normalMsgs = chatMsgs.filter(m => m.metadata?.type !== 'post_context')
+              const firstNormalMsg = normalMsgs[0]
+              return (
+                <>
+            <div style={{display:'grid',gridTemplateColumns:'40px 1fr 40px',alignItems:'center',gap:'10px',padding:'14px 16px 12px',position:'relative' as const,paddingTop:'calc(14px + env(safe-area-inset-top))',background:'#ffffff',zIndex:10,flexShrink:0}}>
+              <button onClick={closeChat} style={{background:'none',border:'none',cursor:'pointer',color:'#4b5563',padding:0,width:'36px',height:'36px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',minWidth:0}}>
+                <img src={avImg(chatTarget.id)} alt="" style={{width:'42px',height:'42px',borderRadius:'50%',objectFit:'cover',flexShrink:0}}/>
+                <div style={{fontWeight:700,fontSize:'1.02rem',color:'#202124',whiteSpace:'nowrap'}}>Anonymous</div>
+              </div>
+              <button onClick={()=>setShowChatMenu(v=>!v)} style={{background:'none',border:'none',cursor:'pointer',color:'#6b7280',fontSize:'1.25rem',padding:'4px',width:'36px',height:'36px',display:'flex',alignItems:'center',justifyContent:'center'}}>•••</button>
               {showChatMenu&&(
-                <div style={{position:'absolute' as const,top:'52px',right:'12px',background:C.card,border:`1px solid ${C.border}`,borderRadius:'12px',padding:'4px',zIndex:600,boxShadow:`0 4px 16px ${C.shadow}`,minWidth:'150px'}}>
-                  <button onClick={clearChat} style={{width:'100%',padding:'10px 14px',background:'none',border:'none',color:C.red,cursor:'pointer',textAlign:'left' as const,fontFamily:'inherit',fontSize:'0.9rem',borderRadius:'8px'}}>🗑 删除聊天记录</button>
+                <div style={{position:'absolute' as const,top:'calc(100% - 2px)',right:'12px',background:'rgba(255,255,255,0.92)',border:'1px solid rgba(15,23,42,0.08)',borderRadius:'14px',padding:'4px',zIndex:600,boxShadow:'0 14px 36px rgba(15,23,42,0.16)',minWidth:'164px',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)'}}>
+                  <button onClick={clearChat} style={{width:'100%',padding:'11px 14px',background:'none',border:'none',color:'#ef4444',cursor:'pointer',textAlign:'left' as const,fontFamily:'inherit',fontSize:'0.92rem',borderRadius:'10px',fontWeight:700}}>Delete chat</button>
                 </div>
               )}
             </div>
-            <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:'16px',display:'flex',flexDirection:'column',gap:'10px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}} onClick={()=>{setSelectedMsg(null);setShowChatMenu(false)}}>
-              {chatMsgs.map(m=>{
+            <div ref={chatRef} style={{flex:1,overflowY:'auto',padding:'8px 12px 0',display:'flex',flexDirection:'column',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch',background:'#ffffff'}} onClick={()=>{setSelectedMsg(null);setShowChatMenu(false)}}>
+              <div style={{minHeight:'100%',display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:'16px',paddingBottom:'16px'}}>
+              {contextMsg&&(
+                <div style={{alignSelf:'stretch',border:'1px solid rgba(15,23,42,0.12)',borderRadius:'18px',padding:'12px 14px',background:'#ffffff',boxShadow:'0 10px 24px rgba(15,23,42,0.06)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'7px'}}>
+                    <img src={avImg(chatTarget.id)} alt="" style={{width:'28px',height:'28px',borderRadius:'50%',objectFit:'cover'}}/>
+                    <span style={{fontWeight:700,fontSize:'0.96rem',color:'#202124'}}>Anonymous</span>
+                    <span style={{fontSize:'0.82rem',color:'#9ca3af'}}>{ago(contextMsg.created_at)}</span>
+                  </div>
+                  <div style={{fontSize:'1rem',lineHeight:'1.45',color:'#202124',fontWeight:600}}>
+                    {contextMsg.metadata?.post_preview || trimPreview(contextMsg.text || '来自帖子')}
+                  </div>
+                </div>
+              )}
+              <div style={{alignSelf:'center',fontSize:'0.92rem',color:'#b0b4bd',fontWeight:600}}>Messaging as <span style={{color:'#767b84',fontWeight:800}}>Anonymous</span></div>
+              {firstNormalMsg&&<div style={{alignSelf:'center',fontSize:'0.92rem',color:'#9ca3af',fontWeight:600}}>{formatChatDay(firstNormalMsg.created_at)}</div>}
+              {normalMsgs.map(m=>{
                 const mine = m.from_user_id===profile.id
                 const canRecall = mine && (Date.now()-new Date(m.created_at).getTime()) < 2*60*1000
                 const isSel = selectedMsg?.id===m.id
-                const isPostContext = m.metadata?.type === 'post_context'
                 return (
-                  <div key={m.id} style={{alignSelf:mine?'flex-end':'flex-start',maxWidth:'76%'}}>
-                    <div onClick={e=>{e.stopPropagation();mine&&setSelectedMsg(isSel?null:m)}} style={{padding:isPostContext?'12px':'10px 14px',borderRadius:'18px',fontSize:'0.92rem',lineHeight:'1.4',background:isPostContext?(resolved==='light'?'#fff1de':'#2d2118'):(mine?C.accentBright:(resolved==='light'?'#e5e7eb':C.surface2)),color:mine&&!isPostContext?'white':C.text,border:isPostContext?`1px solid ${C.border}`:'none',borderBottomRightRadius:mine&&!isPostContext?'4px':'18px',borderBottomLeftRadius:mine?'18px':'4px',cursor:mine?'pointer':'default'}}>
-                      {isPostContext ? (
-                        <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
-                          <div style={{fontSize:'0.72rem',fontWeight:800,color:C.accentBright,textTransform:'uppercase',letterSpacing:'0.04em'}}>Post Context</div>
-                          <div style={{fontSize:'0.9rem',fontWeight:700}}>来自这条帖子</div>
-                          <div style={{fontSize:'0.86rem',color:C.muted}}>{m.metadata?.post_preview || '查看原帖'}</div>
-                        </div>
-                      ) : m.text}
+                  <div key={m.id} style={{alignSelf:mine?'flex-end':'flex-start',maxWidth:'74%'}}>
+                    <div onClick={e=>{e.stopPropagation();mine&&setSelectedMsg(isSel?null:m)}} style={{padding:'10px 14px',borderRadius:'18px',fontSize:'0.96rem',lineHeight:'1.4',background:mine?'linear-gradient(135deg, #c026ff 0%, #7c3aed 100%)':'#f3f4f6',color:mine?'white':'#202124',border:'none',borderBottomRightRadius:mine?'6px':'18px',borderBottomLeftRadius:mine?'18px':'6px',cursor:mine?'pointer':'default',boxShadow:mine?'0 8px 20px rgba(168,85,247,0.24)':'none',display:'inline-flex',alignItems:'flex-end',gap:'7px',flexWrap:'wrap'}}>
+                      <span>{m.text}</span>
+                      <span style={{fontSize:'0.78rem',fontWeight:700,color:mine?'rgba(255,255,255,0.82)':'#9ca3af'}}>{formatBubbleTime(m.created_at)}</span>
                     </div>
-                    <div style={{fontSize:'0.7rem',color:C.muted,marginTop:'3px',textAlign:mine?'right':'left'}}>{ago(m.created_at)}</div>
                     {isSel&&mine&&(
                       <div style={{display:'flex',justifyContent:'flex-end',marginTop:'4px',gap:'6px'}}>
-                        {canRecall&&<button onClick={()=>recallMsg(m)} style={{background:C.red,color:'white',border:'none',borderRadius:'8px',padding:'4px 10px',fontSize:'0.75rem',cursor:'pointer',fontFamily:'inherit'}}>撤回</button>}
-                        {!canRecall&&<span style={{fontSize:'0.72rem',color:C.muted}}>超过2分钟无法撤回</span>}
+                        {canRecall&&<button onClick={()=>recallMsg(m)} style={{background:'#ef4444',color:'white',border:'none',borderRadius:'8px',padding:'4px 10px',fontSize:'0.75rem',cursor:'pointer',fontFamily:'inherit'}}>撤回</button>}
+                        {!canRecall&&<span style={{fontSize:'0.72rem',color:'#9ca3af'}}>超过2分钟无法撤回</span>}
                       </div>
                     )}
                   </div>
                 )
               })}
-              {chatMsgs.length===0&&<div style={{color:C.muted,textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
+              {normalMsgs.length===0&&<div style={{color:'#b0b4bd',textAlign:'center',margin:'auto'}}>发个消息打个招呼 👋</div>}
+              </div>
             </div>
-            <div style={{padding:'10px 12px',paddingBottom:`calc(${10 + keyboardInset}px + env(safe-area-inset-bottom))`,flexShrink:0,background:C.bg,zIndex:10,borderTop:`1px solid ${C.border}`}}>
-              <div style={{display:'flex',gap:'8px',alignItems:'center',background:resolved==='light'?'rgba(240,240,240,0.85)':'rgba(255,255,255,0.08)',backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',borderRadius:'24px',padding:'6px 6px 6px 16px'}}>
-                <input ref={chatInputRef} style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.text,fontSize:'0.92rem',fontFamily:'inherit',fontWeight:600}} placeholder="Message…" value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
-                <button onClick={sendMsg} style={{width:'36px',height:'36px',borderRadius:'50%',background:C.accentBright,color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <div style={{padding:'8px 12px',paddingBottom:`calc(${8 + keyboardInset}px + env(safe-area-inset-bottom))`,flexShrink:0,background:'#ffffff',zIndex:10}}>
+              <div style={{display:'flex',gap:'8px',alignItems:'center',background:'#ffffff',border:'1px solid rgba(15,23,42,0.08)',boxShadow:'0 10px 24px rgba(15,23,42,0.08)',borderRadius:'24px',padding:'6px 6px 6px 14px'}}>
+                <input ref={chatInputRef} style={{flex:1,background:'transparent',border:'none',outline:'none',color:'#202124',fontSize:'0.98rem',fontFamily:'inherit',fontWeight:500}} placeholder="Message..." value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} />
+                <button onClick={sendMsg} style={{width:'34px',height:'34px',borderRadius:'50%',background:'linear-gradient(135deg, #f0abfc 0%, #c084fc 100%)',color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 8px 18px rgba(216,180,254,0.45)'}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="18" x2="12" y2="6"/><polyline points="7 11 12 6 17 11"/></svg>
                 </button>
               </div>
             </div>
+                </>
+              )
+            })()}
           </div>
         </>)}
       </>}
