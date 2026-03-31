@@ -45,8 +45,8 @@ function avColor(uid: string) { return AV_COLORS[uid.charCodeAt(0) % AV_COLORS.l
 function avImg(uid: string) { return AV_LOGOS[uid.charCodeAt(0) % AV_LOGOS.length] }
 function splitTaggedText(text: string) {
   const firstLine = text.split('\n')[0]
-  const maybeTag = firstLine && firstLine === firstLine.toUpperCase() ? firstLine : ''
-  return { tagLine: maybeTag, body: maybeTag ? text.slice(firstLine.length).trim() : text }
+  const hasBreak = text.includes('\n')
+  return { tagLine: firstLine, body: hasBreak ? text.slice(firstLine.length).trim() : text }
 }
 function trimPreview(text: string, max = 80) {
   const clean = text.replace(/\s+/g, ' ').trim()
@@ -406,7 +406,13 @@ export default function App() {
       }
     }
     const finalText = postTag ? `${postTag}\n${postText.trim()}` : postText.trim()
-    await sb.from('posts').insert({user_id:profile.id,text:finalText,is_anon:postAnon,school:profile.school,images:urls})
+    const { error } = await sb.from('posts').insert({user_id:profile.id,text:finalText,is_anon:postAnon,school:profile.school,images:urls})
+    if (error) {
+      console.error('Submit post error:', error)
+      alert('发帖失败: ' + error.message)
+      setPosting(false)
+      return
+    }
     setPostText('');setPostImgs([]);setPostPrevs([]);setPostTag('');setShowPost(false);setPosting(false);loadPosts()
   }
   function pickImgs(e){
@@ -1280,6 +1286,7 @@ export default function App() {
     const cmtsOpen = !!openCmts[p.id]
     const { tagLine, body } = splitTaggedText(p.text)
     const matchTag = POST_TAGS.find(t => t.tag === tagLine)
+    const displayText = matchTag ? body : p.text
     const commentCount = p.comments_count || 0
     const repostCount = (p as any).reposts_count || 0
     const useCompactVoteRow = !matchTag && (!p.images || p.images.length === 0) && !(p as any).repost_of
@@ -1298,7 +1305,7 @@ export default function App() {
             {p.is_hot && <span style={{background:'#fef3c7',color:'#d97706',borderRadius:'4px',padding:'1px 6px',fontSize:'0.68rem',fontWeight:700}}>🔥 HOT</span>}
           </div>
           {matchTag && <span style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'3px 10px',borderRadius:'16px',fontSize:'0.72rem',fontWeight:800,marginBottom:'6px',background:matchTag.bg,color:matchTag.color}}>{matchTag.emoji} {matchTag.tag}</span>}
-          <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{body}</div>
+          <div onClick={()=>openPost(p)} style={{cursor:'pointer',fontSize:'0.95rem',lineHeight:'1.55',color:C.text,wordBreak:'break-word'}}>{displayText}</div>
           {p.images&&p.images.length>0&&<div style={{display:'grid',gridTemplateColumns:p.images.length===1?'1fr':'1fr 1fr',gap:'4px',marginTop:'10px',borderRadius:'12px',overflow:'hidden'}}>{p.images.slice(0,4).map((url,i)=><img key={i} src={url} alt="" style={{width:'100%',height:p.images.length===1?'220px':'130px',objectFit:'cover'}}/>)}</div>}
           {(p as any).repost_of&&(
             <div style={{border:`1.5px solid ${C.border}`,borderRadius:'14px',padding:'14px 14px',marginTop:'10px',background:C.bg,cursor:'pointer'}} onClick={e=>{e.stopPropagation();openPost((p as any).repost_of)}}>
@@ -2001,7 +2008,7 @@ export default function App() {
         <div
           ref={postSheetRef}
           className={postClosing?'fade-out':'fade-in'}
-          style={{position:'fixed',left:0,right:0,bottom:`${keyboardInset}px`,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,borderRadius:'28px 28px 0 0',height:`min(calc(100dvh - ${keyboardInset}px - 170px), ${postPrevs.length > 0 ? '390px' : '310px'})`,display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain',boxShadow:'0 -14px 34px rgba(0,0,0,0.22)',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.06)'}`}}
+          style={{position:'fixed',left:0,right:0,bottom:`${keyboardInset}px`,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,borderRadius:'28px 28px 0 0',height:`min(calc(100dvh - ${keyboardInset}px - 170px), ${postPrevs.length > 0 ? '390px' : '310px'})`,display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'none',touchAction:'none',boxShadow:'0 -14px 34px rgba(0,0,0,0.22)',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.06)'}`}}
           onTouchStart={e=>{
             postDragStart.current=e.touches[0].clientY
             postDragTrack.current=0
@@ -2011,6 +2018,7 @@ export default function App() {
             postDragAllowed.current = !touchInScroll || (scrollArea ? scrollArea.scrollTop <= 0 : true)
           }}
           onTouchMove={e=>{
+            if (e.cancelable) e.preventDefault()
             const dy=e.touches[0].clientY-postDragStart.current
             // If we started dragging (sheet is moving), keep allowing it
             if(postDragTrack.current > 0) postDragAllowed.current = true
@@ -2071,7 +2079,7 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div ref={postScrollAreaRef} style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'72px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
+              <div ref={postScrollAreaRef} style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'72px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch',touchAction:'pan-y'}}>
                 <textarea
                   style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.55',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'78px'}}
                   placeholder="Share what's really on your mind..."
@@ -2464,10 +2472,11 @@ export default function App() {
               {(() => {
                 const { tagLine, body } = splitTaggedText(selectedPost.text || '')
                 const detailTag = POST_TAGS.find(t => t.tag === tagLine)
+                const detailText = detailTag ? body : (selectedPost.text || '')
                 return (
                   <>
                     {detailTag && <div style={{display:'inline-flex',alignItems:'center',gap:'6px',padding:'4px 11px',borderRadius:'999px',fontSize:'0.76rem',fontWeight:800,marginBottom:'10px',background:detailTag.bg,color:detailTag.color}}>{detailTag.emoji} {detailTag.tag}</div>}
-                    {body && <div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'12px'}}>{body}</div>}
+                    {detailText && <div style={{fontSize:'1rem',lineHeight:'1.6',marginBottom:'12px'}}>{detailText}</div>}
                   </>
                 )
               })()}
