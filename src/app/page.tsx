@@ -1184,6 +1184,7 @@ export default function App() {
     const matchTag = POST_TAGS.find(t => t.tag === tagLine)
     const commentCount = p.comments_count || 0
     const repostCount = (p as any).reposts_count || 0
+    const useCompactVoteRow = !matchTag && (!p.images || p.images.length === 0) && !(p as any).repost_of
 
     return (
       <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px 10px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
@@ -1229,7 +1230,18 @@ export default function App() {
             <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             </button>
-            <div style={{position:'relative',marginLeft:'auto'}}>
+            {useCompactVoteRow && (
+              <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'2px'}}>
+                <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'4px',display:'flex'}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.1"><polyline points="18 15 12 9 6 15"/></svg>
+                </button>
+                <span style={{fontWeight:800,fontSize:'0.98rem',minWidth:'16px',textAlign:'center',color:score>0?C.upvote:score<0?C.red:C.muted}}>{score}</span>
+                <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'4px',display:'flex'}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.1"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              </div>
+            )}
+            <div style={{position:'relative',marginLeft:useCompactVoteRow?'8px':'auto'}}>
               <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
               {showPostMenu===p.id&&(
                 <div style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.45)':'rgba(40,40,60,0.4)',backdropFilter:'blur(40px) saturate(200%)',WebkitBackdropFilter:'blur(40px) saturate(200%)',borderRadius:'14px',overflow:'hidden',zIndex:200,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
@@ -1274,7 +1286,7 @@ export default function App() {
           )}
         </div>
         {/* vote col */}
-        <div onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'44px',padding:'4px 0'}}>
+        {!useCompactVoteRow && <div onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'44px',padding:'4px 0'}}>
           <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'6px'}}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.2"><polyline points="18 15 12 9 6 15"/></svg>
           </button>
@@ -1282,7 +1294,7 @@ export default function App() {
           <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'6px'}}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-        </div>
+        </div>}
       </div>
     )
   }
@@ -1853,8 +1865,9 @@ export default function App() {
         <div
           ref={postSheetRef}
           className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:0,zIndex:400,background:C.bg,borderRadius:'22px 22px 0 0',maxHeight:showTagPicker?'85vh':'75vh',display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.12)',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain'}}
+          style={{position:'fixed',left:0,right:0,bottom:`${keyboardInset}px`,zIndex:400,background:C.bg,borderRadius:'28px 28px 0 0',height:`min(calc(100dvh - ${keyboardInset}px - 10px), ${showTagPicker ? '860px' : '760px'})`,display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.22)',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain'}}
           onTouchStart={e=>{
+            if (keyboardInset > 0) return
             postDragStart.current=e.touches[0].clientY
             postDragTrack.current=0
             // Allow drag if: touch is NOT inside scrollable content, OR scrollable content is at top
@@ -1863,6 +1876,7 @@ export default function App() {
             postDragAllowed.current = !touchInScroll || (scrollArea ? scrollArea.scrollTop <= 0 : true)
           }}
           onTouchMove={e=>{
+            if (keyboardInset > 0) return
             const dy=e.touches[0].clientY-postDragStart.current
             // If we started dragging (sheet is moving), keep allowing it
             if(postDragTrack.current > 0) postDragAllowed.current = true
@@ -1878,6 +1892,7 @@ export default function App() {
             }
           }}
           onTouchEnd={()=>{
+            if (keyboardInset > 0) return
             if(postDragTrack.current>80){
               if(postSheetRef.current){
                 postSheetRef.current.style.transition='transform 0.3s ease'
@@ -1893,7 +1908,7 @@ export default function App() {
             postDragAllowed.current=false
           }}
         >
-            <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:'grab',flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:keyboardInset>0?'default':'grab',flexShrink:0}}>
               <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px 8px',flexShrink:0}}>
@@ -1928,7 +1943,7 @@ export default function App() {
             ) : (
               <div ref={postScrollAreaRef} style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
                 <textarea
-                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'80px'}}
+                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'160px'}}
                   placeholder="Share what's really on your mind..."
                   value={postText}
                   onChange={e=>setPostText(e.target.value)}
@@ -1938,7 +1953,7 @@ export default function App() {
               </div>
             )}
             {/* toolbar */}
-            <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 16px',borderTop:`1px solid ${C.border}`,flexShrink:0,background:C.bg}}>
+            <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'8px 16px',paddingBottom:`calc(${8 + keyboardInset}px + env(safe-area-inset-bottom, 0px))`,borderTop:`1px solid ${C.border}`,flexShrink:0,background:C.bg}}>
               <button onClick={()=>setShowTagPicker(v=>!v)} style={{display:'flex',alignItems:'center',gap:'4px',background:showTagPicker?C.accentBright:C.surface,border:`1px solid ${showTagPicker?C.accentBright:C.border}`,borderRadius:'20px',padding:'5px 10px',fontSize:'0.8rem',fontWeight:700,color:showTagPicker?'white':C.text,cursor:'pointer',fontFamily:'inherit'}}>+ Tag</button>
               <label style={{cursor:'pointer',color:C.muted,display:'flex',alignItems:'center',padding:'5px'}}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
