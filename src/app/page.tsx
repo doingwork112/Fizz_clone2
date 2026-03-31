@@ -162,7 +162,7 @@ export default function App() {
   const [repostClosing, setRepostClosing] = useState(false)
   const [repostDragY, setRepostDragY] = useState(0)
   const repostDragStart = useRef(0)
-  const [showPostMenu, setShowPostMenu] = useState<string|null>(null)
+  const [postMenuState, setPostMenuState] = useState<{ post: Post; x: number; y: number } | null>(null)
   const showPostRef = useRef(false)
   const showRepostRef = useRef(false)
   const postSheetRef = useRef<HTMLDivElement>(null)
@@ -1346,25 +1346,17 @@ export default function App() {
                 </button>
               </div>
             )}
-            <div style={{position:'relative',marginLeft:useCompactVoteRow?'8px':'auto',zIndex:showPostMenu===p.id?210:1}}>
-              <button onClick={e=>{e.stopPropagation();setShowPostMenu(showPostMenu===p.id?null:p.id)}} style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}>•••</button>
-              {showPostMenu===p.id&&(
-                <div onClick={e=>e.stopPropagation()} style={{position:'absolute',right:0,bottom:'30px',background:resolved==='light'?'rgba(255,255,255,0.45)':'rgba(40,40,60,0.4)',backdropFilter:'blur(40px) saturate(200%)',WebkitBackdropFilter:'blur(40px) saturate(200%)',borderRadius:'14px',overflow:'hidden',zIndex:220,minWidth:'170px',boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,transformOrigin:'bottom right',animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards',pointerEvents:'auto'}}>
-                  <button onClick={e=>{e.stopPropagation();setShowPostMenu(null)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
-                    <span>🚨</span> Report
-                  </button>
-                  {p.user_id===profile!.id&&(
-                    <button onClick={async e=>{e.stopPropagation();setShowPostMenu(null);await deletePst(p.id)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.08)'}`,cursor:'pointer',color:C.red,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
-                      <span>🗑️</span> Delete
-                    </button>
-                  )}
-                  {p.user_id!==profile!.id&&(
-                    <button onClick={e=>{e.stopPropagation();setShowPostMenu(null);alert('Block user 功能还没接后端，但菜单点击现在已经接通了。')}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.08)'}`,cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
-                      <span>🚫</span> Block this user
-                    </button>
-                  )}
-                </div>
-              )}
+            <div style={{position:'relative',marginLeft:useCompactVoteRow?'8px':'auto'}}>
+              <button
+                onClick={e=>{
+                  e.stopPropagation()
+                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                  setPostMenuState(current => current?.post.id === p.id ? null : { post: p, x: rect.right, y: rect.top })
+                }}
+                style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}
+              >
+                •••
+              </button>
             </div>
           </div>
           )})()}
@@ -1981,8 +1973,44 @@ export default function App() {
         </button>
       </div>}
 
-      {/* Dismiss post menu backdrop */}
-      {showPostMenu&&<div onClick={()=>setShowPostMenu(null)} style={{position:'fixed',inset:0,zIndex:199}}/>}
+      {/* Post menu overlay */}
+      {postMenuState && (
+        <>
+          <div onClick={()=>setPostMenuState(null)} style={{position:'fixed',inset:0,zIndex:239}}/>
+          <div
+            onClick={e=>e.stopPropagation()}
+            style={{
+              position:'fixed',
+              top:Math.max(12, postMenuState.y - 96),
+              right:`max(12px, calc(100vw - ${postMenuState.x}px))`,
+              background:resolved==='light'?'rgba(255,255,255,0.72)':'rgba(40,40,60,0.78)',
+              backdropFilter:'blur(40px) saturate(200%)',
+              WebkitBackdropFilter:'blur(40px) saturate(200%)',
+              borderRadius:'14px',
+              overflow:'hidden',
+              zIndex:240,
+              minWidth:'170px',
+              boxShadow:`0 8px 32px ${resolved==='light'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.35)'}`,
+              border:`1px solid ${resolved==='light'?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.08)'}`,
+              animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'
+            }}
+          >
+            <button onClick={e=>{e.stopPropagation();setPostMenuState(null)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+              <span>🚨</span> Report
+            </button>
+            {postMenuState.post.user_id===profile?.id&&(
+              <button onClick={async e=>{e.stopPropagation();const postId = postMenuState.post.id; setPostMenuState(null); await deletePst(postId)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.08)'}`,cursor:'pointer',color:C.red,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                <span>🗑️</span> Delete
+              </button>
+            )}
+            {postMenuState.post.user_id!==profile?.id&&(
+              <button onClick={e=>{e.stopPropagation();setPostMenuState(null);alert('Block user 功能还没接后端，但菜单点击现在已经接通了。')}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.08)'}`,cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+                <span>🚫</span> Block this user
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ─── BOTTOM NAV ─── */}
       <nav style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:'430px',background:C.bg,borderTop:`1px solid ${C.border}`,display:'flex',zIndex:200,paddingBottom:`calc(34px + env(safe-area-inset-bottom, 0px))`}}>
