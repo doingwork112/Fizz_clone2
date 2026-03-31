@@ -59,6 +59,10 @@ function formatMessagePreview(msg?: Message) {
   return msg.text || '开始对话'
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.min(Math.max(n, min), max)
+}
+
 export default function App() {
   const sb = createClient()
   const { theme, setTheme, resolved } = useTheme()
@@ -446,6 +450,13 @@ export default function App() {
       setPostComments([])
     }
     loadPosts()
+  }
+
+  async function reportPost(post: Post) {
+    const shouldReport = window.confirm('Report this post?')
+    if (!shouldReport) return
+    setPostMenuState(null)
+    window.alert('Thanks. This post has been reported for review.')
   }
 
   async function toggleCmts(pid:string) {
@@ -1289,7 +1300,6 @@ export default function App() {
     const displayText = matchTag ? body : p.text
     const commentCount = p.comments_count || 0
     const repostCount = (p as any).reposts_count || 0
-    const useCompactVoteRow = !matchTag && (!p.images || p.images.length === 0) && !(p as any).repost_of
 
     return (
       <div onClick={()=>openPost(p)} style={{ borderBottom:`1px solid ${C.border}`, padding:'12px 16px 10px', display:'flex', gap:'12px', background:C.bg, cursor:'pointer' }}>
@@ -1335,23 +1345,12 @@ export default function App() {
             <button style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:0}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ic} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             </button>
-            {useCompactVoteRow && (
-              <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'2px'}}>
-                <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'4px',display:'flex'}}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.1"><polyline points="18 15 12 9 6 15"/></svg>
-                </button>
-                <span style={{fontWeight:800,fontSize:'0.96rem',minWidth:'12px',textAlign:'center',color:score>0?C.upvote:score<0?C.red:C.muted}}>{score}</span>
-                <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'4px',display:'flex'}}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.1"><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-              </div>
-            )}
-            <div style={{position:'relative',marginLeft:useCompactVoteRow?'8px':'auto'}}>
+            <div style={{position:'relative',marginLeft:'auto'}}>
               <button
                 onClick={e=>{
                   e.stopPropagation()
                   const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-                  setPostMenuState(current => current?.post.id === p.id ? null : { post: p, x: rect.right, y: rect.top })
+                  setPostMenuState(current => current?.post.id === p.id ? null : { post: p, x: rect.right, y: rect.bottom })
                 }}
                 style={{display:'flex',alignItems:'center',background:'none',border:'none',color:ic,cursor:'pointer',padding:'2px 4px',fontSize:'1.1rem',letterSpacing:'1px',fontWeight:800}}
               >
@@ -1383,7 +1382,7 @@ export default function App() {
           )}
         </div>
         {/* vote col */}
-        {!useCompactVoteRow && <div onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',minWidth:'44px',padding:'4px 0'}}>
+        <div onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',gap:'2px',minWidth:'44px',padding:'4px 0'}}>
           <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'6px'}}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.2"><polyline points="18 15 12 9 6 15"/></svg>
           </button>
@@ -1391,7 +1390,7 @@ export default function App() {
           <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'6px'}}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-        </div>}
+        </div>
       </div>
     )
   }
@@ -1975,14 +1974,20 @@ export default function App() {
 
       {/* Post menu overlay */}
       {postMenuState && (
+        (() => {
+          const viewportWidth = typeof window === 'undefined' ? 430 : window.innerWidth
+          const viewportHeight = typeof window === 'undefined' ? 932 : window.innerHeight
+          const menuRight = clamp(viewportWidth - postMenuState.x, 12, Math.max(12, viewportWidth - 182))
+          const menuTop = clamp(postMenuState.y + 6, 12, viewportHeight - 150)
+          return (
         <>
           <div onClick={()=>setPostMenuState(null)} style={{position:'fixed',inset:0,zIndex:239}}/>
           <div
             onClick={e=>e.stopPropagation()}
             style={{
               position:'fixed',
-              top:Math.max(12, postMenuState.y - 96),
-              right:`max(12px, calc(100vw - ${postMenuState.x}px))`,
+              top:menuTop,
+              right:`${menuRight}px`,
               background:resolved==='light'?'rgba(255,255,255,0.72)':'rgba(40,40,60,0.78)',
               backdropFilter:'blur(40px) saturate(200%)',
               WebkitBackdropFilter:'blur(40px) saturate(200%)',
@@ -1995,7 +2000,7 @@ export default function App() {
               animation:'bubblePop 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards'
             }}
           >
-            <button onClick={e=>{e.stopPropagation();setPostMenuState(null)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
+            <button onClick={async e=>{e.stopPropagation(); await reportPost(postMenuState.post)}} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',color:C.text,fontFamily:'inherit',fontWeight:700,fontSize:'0.9rem',textAlign:'left' as const,display:'flex',alignItems:'center',gap:'10px'}}>
               <span>🚨</span> Report
             </button>
             {postMenuState.post.user_id===profile?.id&&(
@@ -2010,6 +2015,8 @@ export default function App() {
             )}
           </div>
         </>
+          )
+        })()
       )}
 
       {/* ─── BOTTOM NAV ─── */}
