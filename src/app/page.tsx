@@ -417,7 +417,12 @@ export default function App() {
 
   async function deletePst(id:string) {
     if (!confirm('确认删除这条帖子吗？')) return
-    const { error } = await sb.from('posts').delete().eq('id', id).eq('user_id', profile!.id)
+    const ownerId = session?.user?.id || profile?.id
+    if (!ownerId) {
+      alert('删除失败: 当前登录状态失效，请重新登录后再试')
+      return
+    }
+    const { error } = await sb.from('posts').delete().eq('id', id).eq('user_id', ownerId)
     if (error) {
       console.error('Delete post error:', error)
       alert('删除失败: ' + error.message)
@@ -666,12 +671,31 @@ export default function App() {
     savedScrollY.current = window.scrollY
     document.body.classList.add('modal-open')
     document.body.style.top = `-${savedScrollY.current}px`
+    document.documentElement.style.overflow = 'hidden'
   }
   function unlockBody() {
     document.body.classList.remove('modal-open')
     document.body.style.top = ''
+    document.documentElement.style.overflow = ''
     window.scrollTo(0, savedScrollY.current)
   }
+  useEffect(() => {
+    if (!showPost) {
+      unlockBody()
+      return
+    }
+    lockBody()
+    const preventBackgroundTouch = (e: TouchEvent) => {
+      const target = e.target as Node | null
+      const withinComposer = !!(postSheetRef.current && target && postSheetRef.current.contains(target))
+      if (!withinComposer && e.cancelable) e.preventDefault()
+    }
+    document.addEventListener('touchmove', preventBackgroundTouch, { passive: false })
+    return () => {
+      document.removeEventListener('touchmove', preventBackgroundTouch)
+      unlockBody()
+    }
+  }, [showPost])
 
   function openPostModal() {
     setShowPost(true)
@@ -1971,7 +1995,7 @@ export default function App() {
         <div
           ref={postSheetRef}
           className={postClosing?'fade-out':'fade-in'}
-          style={{position:'fixed',inset:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain'}}
+          style={{position:'fixed',left:0,right:0,top:'max(calc(env(safe-area-inset-top) + 22px), 28px)',bottom:`${keyboardInset}px`,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,borderRadius:'28px 28px 0 0',display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain',boxShadow:'0 -10px 40px rgba(0,0,0,0.28)'}}
           onTouchStart={e=>{
             if (keyboardInset > 0) return
             postDragStart.current=e.touches[0].clientY
