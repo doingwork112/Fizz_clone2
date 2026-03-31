@@ -417,15 +417,21 @@ export default function App() {
 
   async function deletePst(id:string) {
     if (!confirm('确认删除这条帖子吗？')) return
-    const ownerId = session?.user?.id || profile?.id
+    const { data: authData } = await sb.auth.getSession()
+    const ownerId = authData.session?.user?.id || session?.user?.id || profile?.id
     if (!ownerId) {
       alert('删除失败: 当前登录状态失效，请重新登录后再试')
       return
     }
-    const { error } = await sb.from('posts').delete().eq('id', id).eq('user_id', ownerId)
+    const { data: deletedRows, error } = await sb.from('posts').delete().eq('id', id).eq('user_id', ownerId).select('id')
     if (error) {
       console.error('Delete post error:', error)
       alert('删除失败: ' + error.message)
+      return
+    }
+    if (!deletedRows || deletedRows.length === 0) {
+      console.error('Delete post blocked', { id, ownerId })
+      alert('删除失败: 这条帖子没有被删掉。大概率是当前登录账号和帖子作者不一致，或者数据库权限没放行。')
       return
     }
     setPosts(prev => prev.filter(p => p.id !== id))
@@ -1991,13 +1997,12 @@ export default function App() {
 
       {/* ─── POST MODAL — bottom sheet ─── */}
       {showPost && (<>
-        <div onClick={closePost} onTouchMove={e=>e.preventDefault()} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.35)'}}/>
+        <div onClick={closePost} onTouchMove={e=>e.preventDefault()} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.04)'}}/>
         <div
           ref={postSheetRef}
           className={postClosing?'fade-out':'fade-in'}
-          style={{position:'fixed',left:0,right:0,top:'max(calc(env(safe-area-inset-top) + 22px), 28px)',bottom:`${keyboardInset}px`,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,borderRadius:'28px 28px 0 0',display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain',boxShadow:'0 -10px 40px rgba(0,0,0,0.28)'}}
+          style={{position:'fixed',left:0,right:0,bottom:`${keyboardInset}px`,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,borderRadius:'28px 28px 0 0',height:`min(calc(100dvh - ${keyboardInset}px - 170px), ${postPrevs.length > 0 ? '390px' : '310px'})`,display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain',boxShadow:'0 -14px 34px rgba(0,0,0,0.22)',borderTop:`1px solid ${resolved==='light'?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.06)'}`}}
           onTouchStart={e=>{
-            if (keyboardInset > 0) return
             postDragStart.current=e.touches[0].clientY
             postDragTrack.current=0
             // Allow drag if: touch is NOT inside scrollable content, OR scrollable content is at top
@@ -2006,7 +2011,6 @@ export default function App() {
             postDragAllowed.current = !touchInScroll || (scrollArea ? scrollArea.scrollTop <= 0 : true)
           }}
           onTouchMove={e=>{
-            if (keyboardInset > 0) return
             const dy=e.touches[0].clientY-postDragStart.current
             // If we started dragging (sheet is moving), keep allowing it
             if(postDragTrack.current > 0) postDragAllowed.current = true
@@ -2022,7 +2026,6 @@ export default function App() {
             }
           }}
           onTouchEnd={()=>{
-            if (keyboardInset > 0) return
             if(postDragTrack.current>80){
               if(postSheetRef.current){
                 postSheetRef.current.style.transition='transform 0.3s ease'
@@ -2038,11 +2041,8 @@ export default function App() {
             postDragAllowed.current=false
           }}
         >
-            <div style={{display:'flex',justifyContent:'center',paddingTop:'calc(8px + env(safe-area-inset-top))',paddingBottom:'8px',cursor:keyboardInset>0?'default':'grab',flexShrink:0}}>
-              <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border,opacity:0.8}}/>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 16px 10px',flexShrink:0}}>
-              <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'2px',display:'flex'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'14px 16px 10px',flexShrink:0}}>
+              <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'2px',display:'flex',alignItems:'center',justifyContent:'center',width:'24px',height:'24px'}}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
               <img src={avImg(profile.id)} alt="" style={{width:'36px',height:'36px',borderRadius:'50%',objectFit:'cover'}}/>
@@ -2071,9 +2071,9 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div ref={postScrollAreaRef} style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
+              <div ref={postScrollAreaRef} style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'72px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
                 <textarea
-                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'240px'}}
+                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.55',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'78px'}}
                   placeholder="Share what's really on your mind..."
                   value={postText}
                   onChange={e=>setPostText(e.target.value)}
