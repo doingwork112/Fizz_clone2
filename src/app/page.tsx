@@ -26,8 +26,8 @@ function useTheme() {
   return { theme, setTheme, resolved }
 }
 
-const LIGHT = { bg:'#fff9f0', surface:'#fff4e4', surface2:'#ffe7c7', border:'#f2d3a6', text:'#22160b', muted:'#8d7662', card:'#fffdf9', accent:'#ff8a3d', accentBright:'#2151ff', upvote:'#2151ff', red:'#df4c35', green:'#1d9b63', shadow:'rgba(122,63,11,0.10)' }
-const DARK =  { bg:'#17110d', surface:'#231913', surface2:'#2f2119', border:'#4e3827', text:'#fff5ea', muted:'#c0ab98', card:'#201711', accent:'#ff9d57', accentBright:'#7aa2ff', upvote:'#7aa2ff', red:'#ff7f66', green:'#49ca89', shadow:'rgba(0,0,0,0.42)' }
+const LIGHT = { bg:'#ffffff', surface:'#f5f5f5', surface2:'#ebebeb', border:'#e8e8e8', text:'#111111', muted:'#8e8e93', card:'#ffffff', accent:'#1a3a5c', accentBright:'#2563eb', upvote:'#2563eb', red:'#ef4444', green:'#16a34a', shadow:'rgba(0,0,0,0.08)' }
+const DARK =  { bg:'#0f0f13', surface:'#18181f', surface2:'#222230', border:'#2e2e3f', text:'#e8e8f0', muted:'#888899', card:'#1e1e28', accent:'#1a3a5c', accentBright:'#7c6ff7', upvote:'#7c6ff7', red:'#f76f6f', green:'#4cd9a0', shadow:'rgba(0,0,0,0.4)' }
 
 const ANON_EMOJIS = ['🦊','🐧','🎩','🦄','🌈','🔮','🎪','🦋','🌊','🎭','🐻','🦁']
 const AV_COLORS = ['#1a3a5c','#2563eb','#7c3aed','#0891b2','#15803d','#b45309','#be123c','#0f766e']
@@ -134,6 +134,8 @@ export default function App() {
   const [showListingMenu, setShowListingMenu] = useState(false)
   const [pendingChat, setPendingChat] = useState<{ user: Profile; tab: 'posts' | 'market' } | null>(null)
   const [keyboardInset, setKeyboardInset] = useState(0)
+  const [profileTab, setProfileTab] = useState<'Posts'|'Comments'|'Saved'>('Posts')
+  const [userComments, setUserComments] = useState<any[]>([])
 
   const [showSplash, setShowSplash] = useState(true)
   const [splashZoom, setSplashZoom] = useState(false)
@@ -236,6 +238,10 @@ export default function App() {
   const commentInputRef = useRef<HTMLInputElement>(null)
   const chatInputRef = useRef<HTMLInputElement>(null)
   const dmInputRef = useRef<HTMLTextAreaElement>(null)
+  const profileIndicatorRef = useRef<HTMLDivElement>(null)
+  const profileBodyRef = useRef<HTMLDivElement>(null)
+  const profileTabRef = useRef<'Posts'|'Comments'|'Saved'>('Posts')
+  const profileSwipeDir = useRef(0)
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -265,6 +271,7 @@ export default function App() {
   useEffect(() => {
     if (!profile) return
     loadPosts(); loadListings(); loadConvos(); loadUnread()
+    loadUserComments()
     const ch = sb.channel('rt-posts').on('postgres_changes',{event:'*',schema:'public',table:'posts'},()=>loadPosts()).subscribe()
     const mch = sb.channel('rt-msgs').on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`to_user_id=eq.${profile.id}`},p=>{
       if(chatTargetRef.current?.id===p.new.from_user_id){
@@ -338,6 +345,11 @@ export default function App() {
       if (freshProfile) setProfile(freshProfile)
     } else setPosts(withReposts)
   }
+  async function loadUserComments() {
+    if (!profileRef.current) return
+    const { data } = await sb.from('comments').select('*, posts(*, profiles(*))').eq('user_id', profileRef.current.id).order('created_at', { ascending: false })
+    setUserComments(data || [])
+  }
 
   function sorted() {
     const p = [...posts]
@@ -405,26 +417,18 @@ export default function App() {
 
   async function deletePst(id:string) {
     if (!confirm('确认删除这条帖子吗？')) return
-    const { data: reposts } = await sb.from('posts').select('id').eq('repost_of_id', id)
-    const postIds = [id, ...(reposts?.map((post:any) => post.id) || [])]
-    const { data: comments } = await sb.from('comments').select('id').in('post_id', postIds)
-    const commentIds = comments?.map((comment:any) => comment.id) || []
-    if (commentIds.length > 0) {
-      await sb.from('comment_votes').delete().in('comment_id', commentIds)
-    }
-    await sb.from('comments').delete().in('post_id', postIds)
-    await sb.from('fizzups').delete().in('post_id', postIds)
-    const { error } = await sb.from('posts').delete().in('id', postIds)
+    const { error } = await sb.from('posts').delete().eq('id', id).eq('user_id', profile!.id)
     if (error) {
       console.error('Delete post error:', error)
       alert('删除失败: ' + error.message)
       return
     }
-    setPosts(prev => prev.filter(p => !postIds.includes(p.id)))
-    if (selectedPost && postIds.includes((selectedPost as any).id)) {
+    setPosts(prev => prev.filter(p => p.id !== id))
+    if (selectedPost && (selectedPost as any).id === id) {
       setSelectedPost(null)
       setPostComments([])
     }
+    loadPosts()
   }
 
   async function toggleCmts(pid:string) {
@@ -457,7 +461,7 @@ export default function App() {
         const { error } = await sb.storage.from('listing-images').upload(path,file,{upsert:true})
         if (!error) { const { data: u } = sb.storage.from('listing-images').getPublicUrl(path); urls.push(u.publicUrl) }
       }
-      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',category:lf.cat||'Other',description:lf.desc||'',condition:lf.condition||'Good',school:profile.school||'Heha'}
+      const ins: Record<string,any> = {user_id:profile.id,title:lf.title,price:parseFloat(lf.price)||0,emoji:'📦',category:lf.cat||'Other',description:lf.desc||'',school:profile.school||'Heha'}
       if (urls.length > 0) ins.images = urls
       const { error: insertErr } = await sb.from('listings').insert(ins)
       if (insertErr) { console.error('Listing insert error:', insertErr); alert('发布失败: ' + insertErr.message); setLUploading(false); return }
@@ -777,6 +781,7 @@ export default function App() {
   const indicatorRef = useRef<HTMLDivElement>(null)
   const feedBodyRef = useRef<HTMLDivElement>(null)
   const feedSwipeDir = useRef(0)
+  profileTabRef.current = profileTab
   feedTabRef.current = feedTab
   profileRef.current = profile
   pageRef.current = page
@@ -930,7 +935,25 @@ export default function App() {
         else if (pageRef.current === 'search') setSrchPullY(Math.min(dy * 0.45, 72))
         else setPullY(Math.min(dy * 0.45, 72))
       }
-      if (pageRef.current === 'market' || pageRef.current === 'messages' || pageRef.current === 'profile' || pageRef.current === 'search') return
+      if (pageRef.current === 'profile') {
+        if (swipeLocked.current === 'h' && e.cancelable) {
+          e.preventDefault()
+          swipeXRef.current = dx
+          profileSwipeDir.current = dx > 0 ? 1 : -1
+          if (profileIndicatorRef.current) {
+            const tabIdx = ['Posts','Comments','Saved'].indexOf(profileTabRef.current)
+            const pct = Math.max(0, Math.min(66.666, tabIdx * 33.333 + (-dx / window.innerWidth * 100)))
+            profileIndicatorRef.current.style.left = pct + '%'
+            profileIndicatorRef.current.style.transition = 'none'
+          }
+          if (profileBodyRef.current) {
+            profileBodyRef.current.style.transition = 'none'
+            profileBodyRef.current.style.transform = `translateX(${dx}px)`
+          }
+        }
+        return
+      }
+      if (pageRef.current === 'market' || pageRef.current === 'messages' || pageRef.current === 'search') return
       // Feed horizontal tab swipe
       if (swipeLocked.current === 'h' && e.cancelable) {
         e.preventDefault()
@@ -1072,9 +1095,54 @@ export default function App() {
       }
       if (pageRef.current !== 'feed' && pageRef.current !== 'market' && pageRef.current !== 'messages' && pageRef.current !== 'profile' && pageRef.current !== 'search') return
       if (pageRef.current === 'profile') {
-        if (profPullYRef.current > 52) {
+        const tabs = ['Posts','Comments','Saved'] as const
+        const idx = tabs.indexOf(profileTabRef.current)
+        let newTab: typeof tabs[number] | null = null
+        if (swipeLocked.current === 'h' && Math.abs(swipeXRef.current) > 40) {
+          if (swipeXRef.current < 0 && idx < tabs.length - 1) newTab = tabs[idx + 1]
+          if (swipeXRef.current > 0 && idx > 0) newTab = tabs[idx - 1]
+        }
+        if (newTab) {
+          const dir = profileSwipeDir.current
+          if (profileBodyRef.current) {
+            profileBodyRef.current.style.transition = 'transform 0.18s ease'
+            profileBodyRef.current.style.transform = `translateX(${dir * window.innerWidth}px)`
+          }
+          const newIdx = tabs.indexOf(newTab)
+          if (profileIndicatorRef.current) {
+            profileIndicatorRef.current.style.transition = 'left 0.22s cubic-bezier(0.4,0,0.2,1)'
+            profileIndicatorRef.current.style.left = `${newIdx * 33.333}%`
+          }
+          setTimeout(() => {
+            setProfileTab(newTab!)
+            if (profileBodyRef.current) {
+              profileBodyRef.current.style.transition = 'none'
+              profileBodyRef.current.style.transform = `translateX(${-dir * window.innerWidth}px)`
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  if (profileBodyRef.current) {
+                    profileBodyRef.current.style.transition = 'transform 0.22s ease'
+                    profileBodyRef.current.style.transform = 'translateX(0)'
+                    setTimeout(() => { if (profileBodyRef.current) profileBodyRef.current.style.transition = '' }, 230)
+                  }
+                })
+              })
+            }
+          }, 190)
+        } else if (swipeLocked.current === 'h') {
+          if (profileBodyRef.current) {
+            profileBodyRef.current.style.transition = 'transform 0.25s ease'
+            profileBodyRef.current.style.transform = 'translateX(0)'
+            setTimeout(() => { if (profileBodyRef.current) profileBodyRef.current.style.transition = '' }, 260)
+          }
+          if (profileIndicatorRef.current) {
+            profileIndicatorRef.current.style.transition = 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
+            profileIndicatorRef.current.style.left = `${idx * 33.333}%`
+          }
+        } else if (profPullYRef.current > 52) {
           setProfRefreshing(true); setProfPullY(0)
           await loadPosts()
+          await loadUserComments()
           setProfRefreshing(false)
         } else { setProfPullY(0) }
         swipeLocked.current = null; swipeXRef.current = 0; return
@@ -1233,11 +1301,11 @@ export default function App() {
             {useCompactVoteRow && (
               <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'2px'}}>
                 <button onClick={()=>vote(p,'up')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='up'?C.upvote:C.muted,padding:'4px',display:'flex'}}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.1"><polyline points="18 15 12 9 6 15"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill={mv==='up'?C.upvote:'none'} stroke={mv==='up'?C.upvote:'currentColor'} strokeWidth="2.1"><polyline points="18 15 12 9 6 15"/></svg>
                 </button>
-                <span style={{fontWeight:800,fontSize:'0.98rem',minWidth:'16px',textAlign:'center',color:score>0?C.upvote:score<0?C.red:C.muted}}>{score}</span>
+                <span style={{fontWeight:800,fontSize:'0.96rem',minWidth:'12px',textAlign:'center',color:score>0?C.upvote:score<0?C.red:C.muted}}>{score}</span>
                 <button onClick={()=>vote(p,'down')} style={{background:'none',border:'none',cursor:'pointer',color:mv==='down'?C.red:C.muted,padding:'4px',display:'flex'}}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.1"><polyline points="6 9 12 15 18 9"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill={mv==='down'?C.red:'none'} stroke={mv==='down'?C.red:'currentColor'} strokeWidth="2.1"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
               </div>
             )}
@@ -1378,7 +1446,7 @@ export default function App() {
 
   return (
     <div
-      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Manrope','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none',backgroundImage:resolved==='light'?'radial-gradient(circle at top, rgba(255,138,61,0.12), transparent 28%)':'radial-gradient(circle at top, rgba(255,157,87,0.14), transparent 22%)'}}
+      style={{minHeight:'100dvh',background:C.bg,color:C.text,fontFamily:"'Varela Round','Nunito','SF Pro Rounded',-apple-system,sans-serif",fontWeight:700,maxWidth:'430px',margin:'0 auto',position:'relative',paddingBottom:'100px',WebkitFontSmoothing:'antialiased',letterSpacing:'0.01em',overscrollBehavior:'none'}}
     >
 
       {/* ─── FEED ─── */}
@@ -1820,18 +1888,56 @@ export default function App() {
         </div>
         {/* Tabs */}
         <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,background:C.bg,zIndex:50}}>
-          {['Posts','Comments','Saved'].map((t,i)=>(
-            <div key={t} style={{flex:1,padding:'12px 10px',textAlign:'center',fontSize:'0.92rem',fontWeight:i===0?800:600,color:i===0?C.text:C.muted,borderBottom:i===0?`2.5px solid ${C.text}`:'2.5px solid transparent',cursor:'pointer',transition:'color 0.15s'}}>{t}</div>
+          {(['Posts','Comments','Saved'] as const).map(t=>(
+            <div key={t} onClick={()=>setProfileTab(t)} style={{flex:1,padding:'12px 10px',textAlign:'center',fontSize:'0.92rem',fontWeight:profileTab===t?800:600,color:profileTab===t?C.text:C.muted,cursor:'pointer',transition:'color 0.15s',position:'relative'}}>{t}</div>
           ))}
+          <div ref={profileIndicatorRef} style={{position:'absolute',bottom:0,height:'2.5px',width:'33.333%',background:C.text,borderRadius:'2px',left:`${(['Posts','Comments','Saved'] as const).indexOf(profileTab)*33.333}%`,transition:'left 0.25s cubic-bezier(0.4,0,0.2,1)'}}/>
         </div>
-        {posts.filter(p=>p.user_id===profile.id).map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
-        {posts.every(p=>p.user_id!==profile.id)&&(
+        <div ref={profileBodyRef} style={{willChange:'transform'}}>
+        {profileTab==='Posts' && posts.filter(p=>p.user_id===profile.id).map(p=><React.Fragment key={p.id}>{PostCard({p})}</React.Fragment>)}
+        {profileTab==='Posts' && posts.every(p=>p.user_id!==profile.id)&&(
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}>
             <div style={{fontSize:'3rem',opacity:.4}}>✏️</div>
             <div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>No posts yet.</div>
             <div style={{fontSize:'0.88rem',textAlign:'center'}}>Write a post and you'll see it here.</div>
           </div>
         )}
+        {profileTab==='Comments' && userComments.map((comment:any)=>(
+          <div key={comment.id} onClick={()=>comment.posts && openPost(comment.posts as Post)} style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
+            <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'6px'}}>{ago(comment.created_at)} · Commented on a post</div>
+            <div style={{fontSize:'0.95rem',color:C.text,lineHeight:'1.5',marginBottom:'8px'}}>{comment.text}</div>
+            {comment.posts?.text && <div style={{fontSize:'0.83rem',color:C.muted,lineHeight:'1.45'}}>Post: {trimPreview(splitTaggedText(comment.posts.text).body || comment.posts.text, 120)}</div>}
+          </div>
+        ))}
+        {profileTab==='Comments' && userComments.length===0 && (
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}>
+            <div style={{fontSize:'3rem',opacity:.4}}>💬</div>
+            <div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>No comments yet.</div>
+          </div>
+        )}
+        {profileTab==='Saved' && savedListings.filter(id=>listings.some(l=>l.id===id)).map(id=>{
+          const listing = listings.find(l=>l.id===id)
+          if (!listing) return null
+          return (
+            <div key={id} onClick={()=>setSelectedListing(listing)} style={{display:'flex',gap:'12px',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,cursor:'pointer'}}>
+              <div style={{width:'72px',height:'72px',borderRadius:'12px',overflow:'hidden',background:C.surface,flexShrink:0}}>
+                {listing.images?.[0] ? <img src={listing.images[0]} alt={listing.title} style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.8rem'}}>{listing.emoji || '📦'}</div>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,color:C.text,marginBottom:'4px'}}>{listing.title}</div>
+                <div style={{fontSize:'0.9rem',color:C.text,marginBottom:'4px'}}>${listing.price}</div>
+                <div style={{fontSize:'0.8rem',color:C.muted}}>{listing.category}</div>
+              </div>
+            </div>
+          )
+        })}
+        {profileTab==='Saved' && savedListings.filter(id=>listings.some(l=>l.id===id)).length===0 && (
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 20px',gap:'14px',color:C.muted}}>
+            <div style={{fontSize:'3rem',opacity:.4}}>🔖</div>
+            <div style={{fontWeight:700,color:C.text,fontSize:'1.05rem'}}>No saved items yet.</div>
+          </div>
+        )}
+        </div>
         <button onClick={()=>openPostModal()} style={{position:'fixed',bottom:'105px',right:'16px',background:'#1a3a5c',color:'white',border:'none',borderRadius:'28px',padding:'13px 18px',fontWeight:700,fontSize:'1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:fabExpanded?'6px':'0',boxShadow:'0 4px 20px rgba(26,58,92,0.5)',zIndex:150,transition:'all 0.3s cubic-bezier(0.4,0,0.2,1)',overflow:'hidden',whiteSpace:'nowrap'}}>
           <span style={{fontSize:'1.1rem',lineHeight:1,flexShrink:0}}>＋</span>
           <span style={{maxWidth:fabExpanded?'50px':'0',overflow:'hidden',opacity:fabExpanded?1:0,transition:'max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.2s ease',whiteSpace:'nowrap'}}>Post</span>
@@ -1861,11 +1967,11 @@ export default function App() {
 
       {/* ─── POST MODAL — bottom sheet ─── */}
       {showPost && (<>
-        <div onClick={closePost} onTouchMove={e=>e.preventDefault()} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.18)'}}/>
+        <div onClick={closePost} onTouchMove={e=>e.preventDefault()} className={postClosing?'fade-out':'fade-in'} style={{position:'fixed',inset:0,zIndex:399,background:'rgba(0,0,0,0.35)'}}/>
         <div
           ref={postSheetRef}
-          className={postClosing?'slide-down':'slide-up'}
-          style={{position:'fixed',left:0,right:0,bottom:`${keyboardInset}px`,zIndex:400,background:C.bg,borderRadius:'28px 28px 0 0',height:`min(calc(100dvh - ${keyboardInset}px - 10px), ${showTagPicker ? '860px' : '760px'})`,display:'flex',flexDirection:'column',boxShadow:'0 -8px 40px rgba(0,0,0,0.22)',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain'}}
+          className={postClosing?'fade-out':'fade-in'}
+          style={{position:'fixed',inset:0,zIndex:400,background:resolved==='light'?'#ffffff':C.bg,display:'flex',flexDirection:'column',willChange:'transform',overflow:'hidden',overscrollBehavior:'contain'}}
           onTouchStart={e=>{
             if (keyboardInset > 0) return
             postDragStart.current=e.touches[0].clientY
@@ -1908,10 +2014,10 @@ export default function App() {
             postDragAllowed.current=false
           }}
         >
-            <div style={{display:'flex',justifyContent:'center',padding:'8px 0 0',cursor:keyboardInset>0?'default':'grab',flexShrink:0}}>
-              <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border}}/>
+            <div style={{display:'flex',justifyContent:'center',paddingTop:'calc(8px + env(safe-area-inset-top))',paddingBottom:'8px',cursor:keyboardInset>0?'default':'grab',flexShrink:0}}>
+              <div style={{width:'36px',height:'4px',borderRadius:'2px',background:C.border,opacity:0.8}}/>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'10px 16px 8px',flexShrink:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'6px 16px 10px',flexShrink:0}}>
               <button onClick={closePost} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,padding:'2px',display:'flex'}}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -1943,7 +2049,7 @@ export default function App() {
             ) : (
               <div ref={postScrollAreaRef} style={{flex:1,padding:'0 16px',overflowY:'auto',minHeight:'80px',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
                 <textarea
-                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'160px'}}
+                  style={{width:'100%',background:'transparent',border:'none',color:C.text,fontSize:'1rem',lineHeight:'1.6',outline:'none',fontFamily:'inherit',resize:'none',minHeight:'240px'}}
                   placeholder="Share what's really on your mind..."
                   value={postText}
                   onChange={e=>setPostText(e.target.value)}

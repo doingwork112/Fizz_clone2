@@ -5,21 +5,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Varela+Round&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap');
-
 :root {
-  --bg: #fff9f0;
-  --surface: #fff4e4;
-  --surface2: #ffe7c7;
-  --border: #f2d3a6;
-  --primary: #ff8a3d;
-  --primary-light: #ffb06f;
-  --accent: #2151ff;
-  --green: #1d9b63;
-  --red: #df4c35;
-  --text: #22160b;
-  --muted: #8d7662;
-  --card: #fffdf9;
+  --bg: #0f0f13;
+  --surface: #18181f;
+  --surface2: #222230;
+  --border: #2e2e3f;
+  --primary: #7c6ff7;
+  --primary-light: #a59af9;
+  --accent: #f7a456;
+  --green: #4cd9a0;
+  --red: #f76f6f;
+  --text: #e8e8f0;
+  --muted: #888899;
+  --card: #1e1e28;
   --radius: 16px;
 }
 
@@ -38,8 +36,8 @@ html, body {
 
 body {
   color: var(--text);
-  font-family: 'Manrope', 'Nunito', 'SF Pro Rounded', -apple-system, sans-serif;
-  font-weight: 600;
+  font-family: 'Varela Round', 'Nunito', 'SF Pro Rounded', -apple-system, sans-serif;
+  font-weight: 700;
 }
 
 body.modal-open {
