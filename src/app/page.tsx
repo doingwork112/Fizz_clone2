@@ -479,6 +479,40 @@ export default function App() {
     setOpenCmts(p=>({...p,[pid]:data||[]})); loadPosts()
   }
 
+  async function deleteComment(comment: any) {
+    if (!confirm('确认删除这条评论吗？')) return
+    const { data: authData } = await sb.auth.getSession()
+    const ownerId = authData.session?.user?.id || session?.user?.id || profile?.id
+    if (!ownerId) {
+      alert('删除失败: 当前登录状态失效，请重新登录后再试')
+      return
+    }
+    const { data: deletedRows, error } = await sb.from('comments').delete().eq('id', comment.id).eq('user_id', ownerId).select('id, post_id')
+    if (error) {
+      console.error('Delete comment error:', error)
+      alert('删除评论失败: ' + error.message)
+      return
+    }
+    if (!deletedRows || deletedRows.length === 0) {
+      alert('删除评论失败: 这条评论没有被删掉。大概率是当前登录账号和评论作者不一致，或者数据库权限没放行。')
+      return
+    }
+    setPostComments(cs=>cs.filter((x:any)=>x.id!==comment.id && x.parent_id!==comment.id))
+    setOpenCmts(current => {
+      const next = { ...current }
+      const postId = comment.post_id || selectedPost?.id
+      if (postId && next[postId]) next[postId] = next[postId].filter((x:any)=>x.id!==comment.id)
+      return next
+    })
+    setUserComments(cs=>cs.filter((x:any)=>x.id!==comment.id))
+    if (replyToComment?.id === comment.id) setReplyToComment(null)
+    if (selectedPost?.id) {
+      const { data } = await sb.from('comments').select('*,profiles(*)').eq('post_id', selectedPost.id).order('created_at')
+      setPostComments(data||[])
+    }
+    loadPosts()
+  }
+
   async function loadListings() {
     const { data } = await sb.from('listings').select('*,profiles(*)').order('created_at',{ascending:false})
     setListings(data||[])
@@ -1379,6 +1413,14 @@ export default function App() {
                     <span style={{fontWeight:700,fontSize:'0.82rem',color:C.text}}>Anonymous </span>
                     <span style={{fontSize:'0.72rem',color:C.muted}}>{ago(c.created_at)}</span>
                     <div style={{fontSize:'0.88rem',color:C.text}}>{c.text}</div>
+                    {c.user_id===profile?.id&&(
+                      <button
+                        onClick={e=>{e.stopPropagation();deleteComment(c)}}
+                        style={{marginTop:'4px',background:'none',border:'none',cursor:'pointer',padding:0,color:C.red,fontSize:'0.76rem',fontWeight:700,fontFamily:'inherit'}}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1965,6 +2007,12 @@ export default function App() {
             <div style={{fontSize:'0.8rem',color:C.muted,marginBottom:'6px'}}>{ago(comment.created_at)} · Commented on a post</div>
             <div style={{fontSize:'0.95rem',color:C.text,lineHeight:'1.5',marginBottom:'8px'}}>{comment.text}</div>
             {comment.posts?.text && <div style={{fontSize:'0.83rem',color:C.muted,lineHeight:'1.45'}}>Post: {trimPreview(splitTaggedText(comment.posts.text).body || comment.posts.text, 120)}</div>}
+            <button
+              onClick={e=>{e.stopPropagation();deleteComment(comment)}}
+              style={{marginTop:'10px',background:'none',border:'none',cursor:'pointer',padding:0,color:C.red,fontSize:'0.82rem',fontWeight:700,fontFamily:'inherit'}}
+            >
+              Delete Comment
+            </button>
           </div>
         ))}
         {profileTab==='Comments' && userComments.length===0 && (
@@ -2605,6 +2653,9 @@ export default function App() {
                           <button onClick={()=>{setDmTarget({...selectedPost,user_id:c.user_id,profiles:c.profiles} as any);setShowDm(true)}} style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:'0.78rem',padding:0,display:'flex',alignItems:'center'}}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                           </button>
+                        )}
+                        {c.user_id===profile.id&&(
+                          <button onClick={()=>deleteComment(c)} style={{background:'none',border:'none',cursor:'pointer',color:C.red,fontSize:'0.78rem',padding:0,fontFamily:'inherit',fontWeight:700}}>Delete</button>
                         )}
                       </div>
                     </div>
